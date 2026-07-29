@@ -1,0 +1,58 @@
+[workspace]
+members = [
+    "crates/qcker-cli",
+    "crates/qcker-runtime",
+    "crates/qcker-common",
+    "crates/qcker-engine",
+    "crates/qcker-ext-api",
+    "crates/qcker-backend",
+]
+resolver = "2"
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+license = "Apache-2.0"
+authors = ["Qcker Team"]
+repository = "https://github.com/qcker/qcker"
+
+[workspace.dependencies]
+# OCI Spec (from youki-dev)
+oci-spec = "0.7"
+
+# CLI
+clap = { version = "4.0", features = ["derive", "env"] }
+
+# Error handling
+thiserror = "1"
+anyhow = "1"
+
+# Logging
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
+# Hashing
+sha2 = "0.10"
+hex = "0.4"
+
+# Linux system
+nix = { version = "0.27", features = ["process", "sched", "mount", "signal", "term", "user", "ioctl", "fs", "hostname"] }
+libc = "0.2"
+capctl = "0.2"
+cgroups-rs = "0.3"
+
+# Filesystem
+tar = "0.4"
+flate2 = "1"
+walkdir = "2"
+tempfile = "3"
+
+# Serialization
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+# Async
+tokio = { version = "1", features = ["full"] }
+
+# Progress bars
+indicatif = "0.17"

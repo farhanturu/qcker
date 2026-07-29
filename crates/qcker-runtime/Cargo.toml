@@ -1,0 +1,21 @@
+[package]
+name = "qcker-runtime"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "OCI runtime implementation for Qcker"
+
+[dependencies]
+qcker-common = { path = "../qcker-common" }
+oci-spec = { workspace = true }
+nix = { workspace = true }
+libc = { workspace = true }
+capctl = { workspace = true }
+cgroups-rs = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+anyhow = { workspace = true }
+tracing = { workspace = true }
+tempfile = { workspace = true }
+chrono = "0.4"

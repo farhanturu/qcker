@@ -1,0 +1,21 @@
+[package]
+name = "qcker-backend"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Qcker runtime backend abstraction - native, MicroVM, WSL2"
+
+[dependencies]
+qcker-common = { path = "../qcker-common" }
+async-trait = "0.1"
+tokio = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+nix = { workspace = true }
+tracing = { workspace = true }
+thiserror = { workspace = true }
+sha2 = { workspace = true }
+hex = { workspace = true }
+dirs = "5"
+chrono = "0.4"
+libc = "0.2"

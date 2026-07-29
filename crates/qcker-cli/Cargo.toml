@@ -1,0 +1,28 @@
+[package]
+name = "qcker"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Qcker - A daemonless, rootless container engine"
+
+[[bin]]
+name = "qcker"
+path = "src/main.rs"
+
+[dependencies]
+qcker-common = { path = "../qcker-common" }
+qcker-runtime = { path = "../qcker-runtime" }
+qcker-engine = { path = "../qcker-engine" }
+clap = { workspace = true }
+anyhow = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+indicatif = { workspace = true }
+dirs = "5"
+nix = { workspace = true }
+tokio = { workspace = true }
+ratatui = "0.28"
+crossterm = "0.28"
+chrono = "0.4"
