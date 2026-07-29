@@ -23,6 +23,14 @@
 
 ---
 
+## TUI Demo
+
+<p align="center">
+  <img src="tui-demo.png" alt="Qcker TUI Demo" width="800">
+</p>
+
+---
+
 ## What is Qcker?
 
 Qcker is a container engine that runs Linux containers without a background daemon. It is written in Rust for safety and speed, and is fully OCI-compliant so it can run existing Docker images.
