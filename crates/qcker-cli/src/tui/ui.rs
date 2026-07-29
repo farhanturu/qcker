@@ -59,8 +59,7 @@ fn draw_header(f: &mut Frame, app: &App, area: Rect) {
     let tabs = Tabs::new(titles)
         .block(Block::default()
             .borders(Borders::ALL)
-            .title("Qcker Container Engine")
-            .title_style(Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)))
+            .title("Qcker"))
         .select(selected)
         .style(Style::default().fg(Color::White))
         .highlight_style(Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD));
@@ -108,12 +107,12 @@ fn draw_containers(f: &mut Frame, app: &App, area: Rect) {
         };
 
         Row::new(vec![
-            Cell::from(c.id[..12.min(c.id.len())].to_string()),
-            Cell::from(c.name.clone()),
-            Cell::from(Span::styled(c.status.clone(), status_style)),
-            Cell::from(c.image.clone()),
+            Cell::from(truncate(&c.id, 12)),
+            Cell::from(truncate(&c.name, 18)),
+            Cell::from(Span::styled(truncate(&c.status, 10), status_style)),
+            Cell::from(truncate(&c.image, 18)),
             Cell::from(c.pid.map_or("-".to_string(), |p| p.to_string())),
-            Cell::from(c.created[..19.min(c.created.len())].to_string()),
+            Cell::from(truncate(&c.created, 16)),
         ])
         .style(style)
         .height(1)
@@ -122,18 +121,18 @@ fn draw_containers(f: &mut Frame, app: &App, area: Rect) {
     let table = Table::new(
         rows,
         [
-            Constraint::Length(14),
-            Constraint::Length(20),
-            Constraint::Length(12),
-            Constraint::Length(20),
+            Constraint::Length(13),
+            Constraint::Length(19),
+            Constraint::Length(11),
+            Constraint::Length(19),
             Constraint::Length(8),
-            Constraint::Min(20),
+            Constraint::Min(17),
         ],
     )
     .header(header)
     .block(Block::default()
         .borders(Borders::ALL)
-        .title(format!("Containers ({}) - Enter:Browse Files", app.containers.len())));
+        .title(format!("Containers ({})", app.containers.len())));
 
     f.render_widget(table, area);
 }
@@ -156,10 +155,10 @@ fn draw_images(f: &mut Frame, app: &App, area: Rect) {
         };
 
         Row::new(vec![
-            Cell::from(img.id[..12.min(img.id.len())].to_string()),
-            Cell::from(img.tags.clone()),
-            Cell::from(img.size.clone()),
-            Cell::from(img.created[..19.min(img.created.len())].to_string()),
+            Cell::from(truncate(&img.id, 12)),
+            Cell::from(truncate(&img.tags, 30)),
+            Cell::from(truncate(&img.size, 10)),
+            Cell::from(truncate(&img.created, 16)),
         ])
         .style(style)
         .height(1)
@@ -168,10 +167,10 @@ fn draw_images(f: &mut Frame, app: &App, area: Rect) {
     let table = Table::new(
         rows,
         [
-            Constraint::Length(14),
-            Constraint::Min(30),
-            Constraint::Length(12),
-            Constraint::Length(20),
+            Constraint::Length(13),
+            Constraint::Min(31),
+            Constraint::Length(11),
+            Constraint::Length(17),
         ],
     )
     .header(header)
@@ -200,10 +199,10 @@ fn draw_networks(f: &mut Frame, app: &App, area: Rect) {
         };
 
         Row::new(vec![
-            Cell::from(n.id[..12.min(n.id.len())].to_string()),
-            Cell::from(n.name.clone()),
-            Cell::from(n.driver.clone()),
-            Cell::from(n.subnet.clone()),
+            Cell::from(truncate(&n.id, 12)),
+            Cell::from(truncate(&n.name, 18)),
+            Cell::from(truncate(&n.driver, 10)),
+            Cell::from(truncate(&n.subnet, 18)),
         ])
         .style(style)
         .height(1)
@@ -212,10 +211,10 @@ fn draw_networks(f: &mut Frame, app: &App, area: Rect) {
     let table = Table::new(
         rows,
         [
-            Constraint::Length(14),
-            Constraint::Length(20),
-            Constraint::Length(12),
-            Constraint::Min(20),
+            Constraint::Length(13),
+            Constraint::Length(19),
+            Constraint::Length(11),
+            Constraint::Min(19),
         ],
     )
     .header(header)
@@ -243,9 +242,9 @@ fn draw_volumes(f: &mut Frame, app: &App, area: Rect) {
         };
 
         Row::new(vec![
-            Cell::from(v.name.clone()),
-            Cell::from(v.driver.clone()),
-            Cell::from(v.mountpoint.clone()),
+            Cell::from(truncate(&v.name, 18)),
+            Cell::from(truncate(&v.driver, 10)),
+            Cell::from(truncate(&v.mountpoint, 40)),
         ])
         .style(style)
         .height(1)
@@ -254,9 +253,9 @@ fn draw_volumes(f: &mut Frame, app: &App, area: Rect) {
     let table = Table::new(
         rows,
         [
-            Constraint::Length(20),
-            Constraint::Length(12),
-            Constraint::Min(40),
+            Constraint::Length(19),
+            Constraint::Length(11),
+            Constraint::Min(41),
         ],
     )
     .header(header)
@@ -291,7 +290,7 @@ fn draw_files(f: &mut Frame, app: &App, area: Rect) {
             Style::default().fg(Color::White)
         };
 
-        let icon = if file.is_dir { "📁" } else { "📄" };
+        let icon = if file.is_dir { "d" } else { "f" };
         let size = if file.is_dir {
             String::new()
         } else {
@@ -299,8 +298,8 @@ fn draw_files(f: &mut Frame, app: &App, area: Rect) {
         };
 
         items.push(ListItem::new(Line::from(vec![
-            Span::styled(format!("{} ", icon), style),
-            Span::styled(file.name.clone(), style),
+            Span::styled(format!("[{}] ", icon), style),
+            Span::styled(truncate(&file.name, 20), style),
             Span::styled(format!("  {}", size), Style::default().fg(Color::Gray)),
         ])));
     }
@@ -308,13 +307,13 @@ fn draw_files(f: &mut Frame, app: &App, area: Rect) {
     let list = List::new(items)
         .block(Block::default()
             .borders(Borders::ALL)
-            .title(format!("Files: {}", app.current_path)));
+            .title(truncate(&format!("Files: {}", app.current_path), 40)));
 
     f.render_widget(list, chunks[0]);
 
     let preview = if let Some(file) = app.files.get(app.selected_index) {
         if file.is_dir {
-            "Directory".to_string()
+            "<Directory>".to_string()
         } else {
             let rootfs = app.data_dir.join("containers")
                 .join(app.selected_container.as_deref().unwrap_or(""))
@@ -322,24 +321,26 @@ fn draw_files(f: &mut Frame, app: &App, area: Rect) {
             let full_path = rootfs.join(file.path.trim_start_matches('/'));
 
             if let Ok(content) = std::fs::read_to_string(&full_path) {
-                if content.len() > 5000 {
-                    format!("{}...\n\n[File too large, showing first 5000 chars]", &content[..5000])
+                let truncated = if content.len() > 2000 {
+                    format!("{}...\n\n[Truncated - {} bytes total]", &content[..2000], content.len())
                 } else {
                     content
-                }
+                };
+                truncated
             } else {
-                "Cannot read file".to_string()
+                "<Cannot read file>".to_string()
             }
         }
     } else {
-        "Select a file to preview".to_string()
+        "<Select a file>".to_string()
     };
 
     let preview_widget = Paragraph::new(preview)
         .block(Block::default()
             .borders(Borders::ALL)
             .title("Preview"))
-        .style(Style::default().fg(Color::White));
+        .style(Style::default().fg(Color::White))
+        .wrap(ratatui::widgets::Wrap { trim: true });
 
     f.render_widget(preview_widget, chunks[1]);
 }
@@ -357,7 +358,7 @@ fn draw_editor(f: &mut Frame, app: &App, area: Rect) {
             let line_num = format!("{:4} ", i + 1);
             Line::from(vec![
                 Span::styled(line_num, Style::default().fg(Color::DarkGray)),
-                Span::styled(line.to_string(), Style::default().fg(Color::White)),
+                Span::styled(truncate(line, 100), Style::default().fg(Color::White)),
             ])
         })
         .collect();
@@ -366,16 +367,17 @@ fn draw_editor(f: &mut Frame, app: &App, area: Rect) {
         .block(Block::default()
             .borders(Borders::ALL)
             .title(if app.editor_modified {
-                "Editor *modified*"
+                "Editor *"
             } else {
                 "Editor"
             }))
-        .style(Style::default().fg(Color::White));
+        .style(Style::default().fg(Color::White))
+        .wrap(ratatui::widgets::Wrap { trim: false });
 
     f.render_widget(editor, chunks[0]);
 
     let status = format!(
-        "Ln {}, Col {} | Ctrl+S: Save | Esc: Close",
+        "Ln {} Col {} | Ctrl+S:Save Esc:Close",
         app.editor_cursor_y + 1,
         app.editor_cursor_x + 1
     );
@@ -388,11 +390,11 @@ fn draw_editor(f: &mut Frame, app: &App, area: Rect) {
 
 fn draw_marketplace(f: &mut Frame, app: &App, area: Rect) {
     let header = Row::new(vec![
-        Cell::from("ID"),
         Cell::from("NAME"),
         Cell::from("VERSION"),
         Cell::from("CATEGORY"),
         Cell::from("STATUS"),
+        Cell::from("DESCRIPTION"),
     ])
     .style(Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD))
     .height(1);
@@ -413,11 +415,11 @@ fn draw_marketplace(f: &mut Frame, app: &App, area: Rect) {
         };
 
         Row::new(vec![
-            Cell::from(ext.id.clone()),
-            Cell::from(ext.name.clone()),
-            Cell::from(ext.version.clone()),
-            Cell::from(ext.category.clone()),
+            Cell::from(truncate(&ext.name, 16)),
+            Cell::from(truncate(&ext.version, 8)),
+            Cell::from(truncate(&ext.category, 10)),
             Cell::from(status),
+            Cell::from(truncate(&ext.description, 30)),
         ])
         .style(style)
         .height(1)
@@ -426,30 +428,31 @@ fn draw_marketplace(f: &mut Frame, app: &App, area: Rect) {
     let table = Table::new(
         rows,
         [
-            Constraint::Length(30),
-            Constraint::Length(20),
-            Constraint::Length(10),
-            Constraint::Length(15),
-            Constraint::Length(12),
+            Constraint::Length(17),
+            Constraint::Length(9),
+            Constraint::Length(11),
+            Constraint::Length(11),
+            Constraint::Min(31),
         ],
     )
     .header(header)
     .block(Block::default()
         .borders(Borders::ALL)
-        .title(format!("Marketplace ({})", app.marketplace.len())));
+        .title(format!("Extensions ({})", app.marketplace.len())));
 
     f.render_widget(table, area);
 }
 
 fn draw_logs(f: &mut Frame, app: &App, area: Rect) {
     let logs: Vec<Line> = app.logs.iter().map(|l| {
-        Line::from(Span::styled(l.clone(), Style::default().fg(Color::White)))
+        Line::from(Span::styled(truncate(l, 120), Style::default().fg(Color::White)))
     }).collect();
 
     let paragraph = Paragraph::new(logs)
         .block(Block::default()
             .borders(Borders::ALL)
-            .title("Logs"));
+            .title("Logs"))
+        .wrap(ratatui::widgets::Wrap { trim: true });
 
     f.render_widget(paragraph, area);
 }
@@ -458,20 +461,22 @@ fn draw_footer(f: &mut Frame, app: &App, area: Rect) {
     let help_text = match app.mode {
         AppMode::Normal => {
             match app.active_tab {
-                super::app::ActiveTab::Marketplace => "q:Quit | Tab:Switch | ↑↓:Navigate | u/Enter:Uninstall | r:Refresh | h:Help",
-                super::app::ActiveTab::Containers => "q:Quit | Tab:Switch | ↑↓:Navigate | Enter:Browse Files | r:Refresh | h:Help",
-                _ => "q:Quit | Tab:Switch | ↑↓:Navigate | r:Refresh | h:Help",
+                super::app::ActiveTab::Marketplace => "q:Quit Tab:Switch u:Uninstall r:Refresh h:Help",
+                super::app::ActiveTab::Containers => "q:Quit Tab:Switch Enter:Files r:Refresh h:Help",
+                _ => "q:Quit Tab:Switch r:Refresh h:Help",
             }
         },
-        AppMode::ContainerFiles => "q:Back | ↑↓:Navigate | Enter:Open | d:Delete | n:NewFile | m:NewDir | Esc:Exit",
-        AppMode::FileEditor => "Ctrl+S:Save | Esc:Close",
-        AppMode::CommandInput => "Enter:Confirm | Esc:Cancel",
-        AppMode::ConfirmDelete => "y:Yes | n:No",
+        AppMode::ContainerFiles => "q:Back Enter:Open d:Delete n:New m:Mkdir Esc:Exit",
+        AppMode::FileEditor => "Ctrl+S:Save Esc:Close",
+        AppMode::CommandInput => "Enter:Confirm Esc:Cancel",
+        AppMode::ConfirmDelete => "y:Yes n:No",
     };
 
+    let status = truncate(&app.status_message, 50);
+
     let footer = Paragraph::new(Line::from(vec![
-        Span::styled(app.status_message.clone(), Style::default().fg(Color::Yellow)),
-        Span::raw("  |  "),
+        Span::styled(status, Style::default().fg(Color::Yellow)),
+        Span::raw(" | "),
         Span::styled(help_text, Style::default().fg(Color::Gray)),
     ]))
     .block(Block::default().borders(Borders::ALL));
@@ -484,7 +489,7 @@ fn draw_confirm_popup(f: &mut Frame, app: &App) {
 
     let text = vec![
         Line::from(Span::styled(
-            app.confirm_message.clone(),
+            truncate(&app.confirm_message, 30),
             Style::default().fg(Color::Red).add_modifier(Modifier::BOLD),
         )),
         Line::from(""),
@@ -510,13 +515,13 @@ fn draw_command_popup(f: &mut Frame, app: &App) {
 
     let text = vec![
         Line::from(Span::styled(
-            app.status_message.clone(),
+            truncate(&app.status_message, 40),
             Style::default().fg(Color::Yellow),
         )),
         Line::from(""),
         Line::from(vec![
             Span::styled("> ", Style::default().fg(Color::Cyan)),
-            Span::styled(app.command_input.clone(), Style::default().fg(Color::White)),
+            Span::styled(truncate(&app.command_input, 30), Style::default().fg(Color::White)),
             Span::styled("_", Style::default().fg(Color::White).add_modifier(Modifier::SLOW_BLINK)),
         ]),
     ];
@@ -532,52 +537,38 @@ fn draw_command_popup(f: &mut Frame, app: &App) {
 }
 
 fn draw_help_popup(f: &mut Frame) {
-    let area = centered_rect(60, 60, f.area());
+    let area = centered_rect(50, 50, f.area());
 
     let help_text = vec![
         Line::from(Span::styled("Qcker TUI Help", Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD))),
         Line::from(""),
-        Line::from(Span::styled("Navigation:", Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD))),
-        Line::from("  Tab / Shift+Tab  Switch between tabs"),
-        Line::from("  ↑ / k            Move up"),
-        Line::from("  ↓ / j            Move down"),
+        Line::from(Span::styled("Navigation:", Style::default().fg(Color::Yellow))),
+        Line::from("  Tab        Switch tabs"),
+        Line::from("  Up/Down    Navigate"),
         Line::from(""),
-        Line::from(Span::styled("Container Actions:", Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD))),
-        Line::from("  Enter            Browse container files"),
-        Line::from("  s                Start selected container"),
-        Line::from("  x                Stop selected container"),
-        Line::from("  d                Delete selected container"),
+        Line::from(Span::styled("Containers:", Style::default().fg(Color::Yellow))),
+        Line::from("  Enter      Browse files"),
         Line::from(""),
-        Line::from(Span::styled("Marketplace:", Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD))),
-        Line::from("  u / Enter        Uninstall selected extension"),
-        Line::from("  r                Refresh extension list"),
-        Line::from("  Request new:     github.com/qcker/qcker-extensions/issues"),
+        Line::from(Span::styled("Files:", Style::default().fg(Color::Yellow))),
+        Line::from("  Enter      Open"),
+        Line::from("  e          Edit"),
+        Line::from("  d          Delete"),
+        Line::from("  n          New file"),
+        Line::from("  m          New dir"),
         Line::from(""),
-        Line::from(Span::styled("File Browser:", Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD))),
-        Line::from("  Enter            Open file/directory"),
-        Line::from("  Backspace        Go to parent directory"),
-        Line::from("  e                Edit file in editor"),
-        Line::from("  d                Delete file/directory"),
-        Line::from("  n                Create new file"),
-        Line::from("  m                Create new directory"),
-        Line::from("  u                Upload file from host"),
-        Line::from("  q / Esc          Exit file browser"),
+        Line::from(Span::styled("Extensions:", Style::default().fg(Color::Yellow))),
+        Line::from("  u/Enter    Uninstall"),
         Line::from(""),
-        Line::from(Span::styled("Editor:", Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD))),
-        Line::from("  Ctrl+S           Save file"),
-        Line::from("  Esc              Close editor"),
-        Line::from(""),
-        Line::from(Span::styled("General:", Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD))),
-        Line::from("  r                Refresh data"),
-        Line::from("  h                Toggle this help"),
-        Line::from("  q / Esc          Quit"),
+        Line::from(Span::styled("General:", Style::default().fg(Color::Yellow))),
+        Line::from("  r          Refresh"),
+        Line::from("  h          Help"),
+        Line::from("  q          Quit"),
     ];
 
     let help = Paragraph::new(help_text)
         .block(Block::default()
             .borders(Borders::ALL)
             .title("Help")
-            .title_style(Style::default().fg(Color::Cyan))
             .style(Style::default().bg(Color::DarkGray)));
 
     f.render_widget(Clear, area);
@@ -602,6 +593,14 @@ fn centered_rect(percent_x: u16, percent_y: u16, r: Rect) -> Rect {
             Constraint::Percentage((100 - percent_x) / 2),
         ])
         .split(popup_layout[1])[1]
+}
+
+fn truncate(s: &str, max_len: usize) -> String {
+    if s.len() <= max_len {
+        s.to_string()
+    } else {
+        format!("{}...", &s[..max_len.saturating_sub(3)])
+    }
 }
 
 fn format_size(size: u64) -> String {
