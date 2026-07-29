@@ -2,7 +2,13 @@
 
 A daemonless, rootless container engine written in Rust.
 
+[![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
+[![Rust](https://img.shields.io/badge/rust-1.70%2B-orange.svg)](https://www.rust-lang.org/)
+[![Tests](https://img.shields.io/badge/tests-50%20passed-brightgreen.svg)](#testing)
+
 Qcker is a lightweight alternative to Docker that runs containers without a background daemon. It starts faster, uses less memory, and has a smaller binary footprint.
+
+**Production by [PaongLabs](https://github.com/farhanturu)**
 
 ## Why Qcker?
 
@@ -17,8 +23,8 @@ Qcker is a lightweight alternative to Docker that runs containers without a back
 ## Quick Start
 
 ```bash
-# Build from source
-git clone https://github.com/qcker/qcker.git
+# Clone and build
+git clone https://github.com/farhanturu/qcker.git
 cd qcker
 cargo build --release
 
@@ -31,34 +37,33 @@ sudo ./target/release/qcker run --rootfs /path/to/rootfs -- /bin/echo "Hello fro
 
 ## Features
 
-- Daemonless architecture (no background process)
-- Rootless by default (no root required for most operations)
-- OCI-compatible (runs standard Linux containers)
-- Resource limits (CPU, memory, PIDs, GPU)
-- Container isolation (namespaces, cgroups, seccomp)
-- Built-in TUI for container management
-- Extension system for custom networking, storage, and security
-- Docker-compatible CLI
+- **Daemonless** - No background process, fork-exec model
+- **Rootless** - Runs without root by default
+- **OCI-compatible** - Runs standard Linux containers
+- **Resource limits** - CPU, memory, PIDs, GPU/VRAM
+- **Container isolation** - Namespaces, cgroups, seccomp
+- **Built-in TUI** - Terminal UI with file management
+- **Extension system** - Custom networking, storage, security
+- **Docker CLI compatible** - Drop-in replacement for most commands
 
 ## CLI Commands
 
 ```
-qcker run       Run a container
-qcker create    Create a container
-qcker start     Start a container
-qcker stop      Stop a container
-qcker kill      Kill a container
-qcker delete    Delete a container
-qcker ps        List containers
-qcker exec      Execute command in container
-qcker images    List images
-qcker build     Build image from Dockerfile
-qcker pull      Pull image from registry
-qcker network   Manage networks
-qcker volume    Manage volumes
-qcker compose   Manage compose applications
-qcker extension Manage extensions
-qcker tui       Open terminal UI
+qcker run           Run a container
+qcker create        Create a container
+qcker start         Start a container
+qcker stop          Stop a container
+qcker kill          Kill a container
+qcker delete        Delete a container
+qcker ps            List containers
+qcker exec          Execute command in container
+qcker images        List images
+qcker build         Build image from Dockerfile
+qcker pull          Pull image from registry
+qcker network       Manage networks
+qcker volume        Manage volumes
+qcker compose       Manage compose applications
+qcker extension     Manage extensions
 ```
 
 ## Resource Limits
@@ -72,16 +77,17 @@ qcker run --rootfs /path/to/rootfs \
     -- /bin/sh
 ```
 
-Options:
-- `--cpus <cores>` - CPU cores (e.g., 1.5)
-- `--cpu-shares <weight>` - CPU shares (default 1024)
-- `--memory <MB>` - Memory limit
-- `--memory-swap <MB>` - Memory + swap limit
-- `--pids-limit <n>` - Max processes (default 256)
-- `--gpu` - Enable GPU access
-- `--vram <MB>` - VRAM limit
-- `--read-only` - Read-only rootfs
-- `--privileged` - Root privileges mode
+| Option | Description |
+|--------|-------------|
+| `--cpus <cores>` | CPU cores (e.g., 1.5) |
+| `--cpu-shares <weight>` | CPU shares (default 1024) |
+| `--memory <MB>` | Memory limit |
+| `--memory-swap <MB>` | Memory + swap limit |
+| `--pids-limit <n>` | Max processes (default 256) |
+| `--gpu` | Enable GPU access |
+| `--vram <MB>` | VRAM limit |
+| `--read-only` | Read-only rootfs |
+| `--privileged` | Root privileges mode |
 
 ## Container Isolation
 
@@ -101,13 +107,48 @@ Security features:
 
 ## TUI
 
-Run `qcker` without arguments to open the Terminal UI:
+Run `qcker` without arguments to open the Terminal UI.
 
-- Tab navigation between Containers, Images, Networks, Volumes, Files, Editor, Logs
-- Browse container files
-- Edit files with built-in editor
-- Create/delete files and directories
-- Container lifecycle management
+**Tabs:** Containers, Images, Networks, Volumes, Files, Editor, Marketplace, Logs
+
+**Navigation:**
+- `Tab/Shift+Tab` - Switch tabs
+- `Up/Down` - Navigate items
+- `Enter` - Select/open
+- `r` - Refresh
+- `h` - Help
+- `q` - Quit
+
+**File Browser:**
+- `Enter` - Open file/directory
+- `e` - Edit file
+- `d` - Delete
+- `n` - New file
+- `m` - New directory
+
+**Marketplace:**
+- `u/Enter` - Uninstall extension
+- Request: [GitHub Issues](https://github.com/farhanturu/qcker-extensions/issues)
+
+## Extensions
+
+Browse and manage extensions in the TUI Marketplace tab.
+
+**Available Extensions:**
+- bridge (network) - Built-in
+- overlayfs (storage) - Built-in
+- trivy (security) - Vulnerability scanning
+- cilium (network) - eBPF networking
+- zfs (storage) - ZFS backend
+- loki (logging) - Grafana Loki
+- buildkit (build) - BuildKit builder
+
+**Install:**
+```bash
+qcker extension install /path/to/extension.so
+```
+
+**Request new:** [Open an issue](https://github.com/farhanturu/qcker-extensions/issues/new?template=extension_request.yml)
 
 ## Architecture
 
@@ -115,37 +156,13 @@ Run `qcker` without arguments to open the Terminal UI:
 qcker/
 ├── crates/
 │   ├── qcker-cli/          # CLI binary + TUI
-│   ├── qcker-runtime/      # OCI runtime (namespaces, cgroups, seccomp)
-│   ├── qcker-backend/      # Runtime backend abstraction
-│   ├── qcker-engine/       # Image, build, network, volume, compose
+│   ├── qcker-runtime/      # OCI runtime
+│   ├── qcker-backend/      # Backend abstraction
+│   ├── qcker-engine/       # Image, build, network, volume, compose, extension
 │   ├── qcker-common/       # Shared utilities
 │   └── qcker-ext-api/      # Extension SDK
-└── extensions/             # Built-in extensions
+└── target/release/qcker    # Binary (~7.5MB)
 ```
-
-## Extension System
-
-Qcker supports extensions for custom networking, storage, security scanning, and more.
-
-```bash
-# List extensions
-qcker extension ls
-
-# Install extension
-qcker extension install /path/to/extension
-
-# Enable/disable
-qcker extension enable <name>
-qcker extension disable <name>
-```
-
-Extension types:
-- Network drivers (bridge, macvlan, cilium)
-- Storage drivers (overlayfs, zfs, btrfs)
-- Security scanners (trivy, grype)
-- Log drivers (json-file, syslog, loki)
-- Build strategies (dockerfile, buildkit)
-- Custom CLI commands
 
 ## Building
 
@@ -169,10 +186,25 @@ cargo clippy
 - Rust 1.70+
 - Root or user namespace support
 
+## Documentation
+
+- [Getting Started](docs/guides/GETTING_STARTED.md)
+- [CLI Reference](docs/api/CLI.md)
+- [Benchmarks](docs/benchmark/BENCHMARK.md)
+- [Extensions](https://github.com/farhanturu/qcker-extensions)
+
 ## License
 
 Apache 2.0
 
+## Author
+
+**PaongLabs** - [GitHub](https://github.com/farhanturu)
+
 ## Tags
 
-docker, docker-alternative, container, container-engine, container-runtime, rust, oci, rootless, daemonless, linux, namespaces, cgroups, podman-alternative, containerization, devops
+```
+docker, docker-alternative, container, container-engine, container-runtime,
+rust, oci, rootless, daemonless, linux, namespaces, cgroups, podman-alternative,
+containerization, devops, lightweight, fast, secure, kubernetes, k8s, crio
+```
