@@ -120,6 +120,37 @@ impl ContainerProcess {
         use nix::sched::{unshare, CloneFlags};
         use nix::unistd::chroot;
 
+        // Determine if we should use user namespace
+        let use_user_ns = if let Some(ref linux) = self.container.config.linux {
+            linux.namespaces.iter().any(|ns| ns.r#type == crate::spec::NamespaceType::User)
+        } else {
+            false
+        };
+
+        // User namespace must be unshared first (before other namespaces)
+        if use_user_ns {
+            unshare(CloneFlags::CLONE_NEWUSER)
+                .map_err(|e| QckerError::Process(format!("Failed to unshare user namespace: {}", e)))?;
+
+            // Write UID/GID mappings
+            let host_uid = qcker_common::fs::getuid();
+            let host_gid = qcker_common::fs::getgid();
+
+            // Deny setgroups before writing gid_map
+            fs::write("/proc/self/setgroups", "deny")
+                .map_err(|e| QckerError::Process(format!("Failed to write setgroups: {}", e)))?;
+
+            // Map container root (0) to host user
+            fs::write("/proc/self/uid_map", format!("0 {} 1", host_uid))
+                .map_err(|e| QckerError::Process(format!("Failed to write uid_map: {}", e)))?;
+
+            fs::write("/proc/self/gid_map", format!("0 {} 1", host_gid))
+                .map_err(|e| QckerError::Process(format!("Failed to write gid_map: {}", e)))?;
+
+            tracing::info!("User namespace created: uid_map=0:{}:1, gid_map=0:{}:1", host_uid, host_gid);
+        }
+
+        // Unshare other namespaces
         if let Some(ref linux) = self.container.config.linux {
             let mut flags = CloneFlags::empty();
             for ns in &linux.namespaces {
@@ -130,11 +161,12 @@ impl ContainerProcess {
                     crate::spec::NamespaceType::Uts => flags |= CloneFlags::CLONE_NEWUTS,
                     crate::spec::NamespaceType::Ipc => flags |= CloneFlags::CLONE_NEWIPC,
                     crate::spec::NamespaceType::Cgroup => flags |= CloneFlags::CLONE_NEWCGROUP,
-                    crate::spec::NamespaceType::User => {}
+                    crate::spec::NamespaceType::User => {} // Already handled above
                 }
             }
             if !flags.is_empty() {
-                let _ = unshare(flags);
+                unshare(flags)
+                    .map_err(|e| QckerError::Process(format!("Failed to unshare namespaces: {}", e)))?;
             }
         }
 
@@ -144,7 +176,8 @@ impl ContainerProcess {
         std::env::set_current_dir("/")
             .map_err(|e| QckerError::Process(format!("Failed to chdir: {}", e)))?;
 
-        nix::unistd::sethostname("container")
+        let hostname = self.container.config.hostname.as_deref().unwrap_or(&self.container.id[..12.min(self.container.id.len())]);
+        nix::unistd::sethostname(hostname)
             .map_err(|e| QckerError::Process(format!("Failed to set hostname: {}", e)))?;
 
         let _ = seccomp::apply_default_profile();
@@ -419,6 +452,7 @@ impl ContainerProcess {
 
     pub fn exec(&self, command: &[String]) -> Result<()> {
         let rootfs = self.container.rootfs.clone();
+        let container_pid = self.container.pid;
 
         let (pipe_read, pipe_write) = nix::unistd::pipe()
             .map_err(|e| QckerError::Process(format!("Failed to create pipe: {}", e)))?;
@@ -448,6 +482,33 @@ impl ContainerProcess {
             }
             ForkResult::Child => {
                 nix::unistd::close(pipe_read).ok();
+
+                // Enter container namespaces if we have a container PID
+                if let Some(pid) = container_pid {
+                    let ns_types = vec![
+                        ("user", crate::spec::NamespaceType::User),
+                        ("mnt", crate::spec::NamespaceType::Mount),
+                        ("pid", crate::spec::NamespaceType::Pid),
+                        ("net", crate::spec::NamespaceType::Network),
+                        ("uts", crate::spec::NamespaceType::Uts),
+                        ("ipc", crate::spec::NamespaceType::Ipc),
+                        ("cgroup", crate::spec::NamespaceType::Cgroup),
+                    ];
+
+                    for (ns_name, _ns_type) in &ns_types {
+                        let ns_path = format!("/proc/{}/ns/{}", pid, ns_name);
+                        if std::path::Path::new(&ns_path).exists() {
+                            let ns_file = std::fs::File::open(&ns_path);
+                            if let Ok(ns_file) = ns_file {
+                                use std::os::unix::io::AsRawFd;
+                                let fd = ns_file.as_raw_fd();
+                                unsafe {
+                                    libc::setns(fd, 0);
+                                }
+                            }
+                        }
+                    }
+                }
 
                 use nix::unistd::chroot;
                 let _ = chroot(rootfs.as_path());

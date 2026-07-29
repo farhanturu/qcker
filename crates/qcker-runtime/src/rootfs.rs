@@ -11,6 +11,21 @@ pub struct RootfsConfig {
     pub layers: Vec<PathBuf>,
     pub rootless: bool,
     pub skip_mounts: bool,
+    pub hostname: Option<String>,
+    pub dns_servers: Vec<String>,
+}
+
+impl Default for RootfsConfig {
+    fn default() -> Self {
+        Self {
+            container_dir: PathBuf::new(),
+            layers: Vec::new(),
+            rootless: false,
+            skip_mounts: true,
+            hostname: None,
+            dns_servers: vec!["8.8.8.8".to_string(), "8.8.4.4".to_string()],
+        }
+    }
 }
 
 pub fn create_rootfs(config: &RootfsConfig) -> Result<PathBuf> {
@@ -38,42 +53,9 @@ pub fn create_rootfs(config: &RootfsConfig) -> Result<PathBuf> {
     }
 
     create_essential_dirs(&rootfs_dir)?;
-    create_essential_files(&rootfs_dir)?;
-
-    if !config.skip_mounts {
-        let _ = bind_mount_host_dirs(&rootfs_dir);
-    }
+    create_essential_files(&rootfs_dir, config)?;
 
     Ok(rootfs_dir)
-}
-
-fn bind_mount_host_dirs(rootfs: &Path) -> Result<()> {
-    let dirs_to_mount = vec!["lib", "lib64", "usr/lib", "usr/lib64", "bin", "sbin", "usr/bin", "usr/sbin"];
-
-    for dir in dirs_to_mount {
-        let host_path = PathBuf::from("/").join(dir);
-        let container_path = rootfs.join(dir);
-
-        if host_path.exists() {
-            fs::create_dir_all(&container_path)
-                .map_err(|e| QckerError::Mount(format!("Failed to create {}: {}", dir, e)))?;
-
-            match mount(
-                Some(&host_path),
-                &container_path,
-                None::<&str>,
-                MsFlags::MS_BIND | MsFlags::MS_REC | MsFlags::MS_RDONLY,
-                None::<&str>,
-            ) {
-                Ok(_) => {}
-                Err(e) => {
-                    tracing::warn!("Failed to mount {}: {}", dir, e);
-                }
-            }
-        }
-    }
-
-    Ok(())
 }
 
 fn create_essential_dirs(rootfs: &Path) -> Result<()> {
@@ -86,17 +68,24 @@ fn create_essential_dirs(rootfs: &Path) -> Result<()> {
     Ok(())
 }
 
-fn create_essential_files(rootfs: &Path) -> Result<()> {
+fn create_essential_files(rootfs: &Path, config: &RootfsConfig) -> Result<()> {
+    // DNS
     let resolv_conf = rootfs.join("etc/resolv.conf");
-    fs::write(&resolv_conf, "nameserver 8.8.8.8\nnameserver 8.8.4.4\n")
+    let dns_content: String = config.dns_servers.iter()
+        .map(|s| format!("nameserver {}\n", s))
+        .collect();
+    fs::write(&resolv_conf, dns_content)
         .map_err(|e| QckerError::Mount(format!("Failed to create resolv.conf: {}", e)))?;
 
-    let hostname = rootfs.join("etc/hostname");
-    fs::write(&hostname, "container\n")
+    // Hostname
+    let hostname = config.hostname.as_deref().unwrap_or("container");
+    let hostname_file = rootfs.join("etc/hostname");
+    fs::write(&hostname_file, format!("{}\n", hostname))
         .map_err(|e| QckerError::Mount(format!("Failed to create hostname: {}", e)))?;
 
+    // Hosts
     let hosts = rootfs.join("etc/hosts");
-    fs::write(&hosts, "127.0.0.1 localhost\n::1 localhost\n127.0.0.1 container\n")
+    fs::write(&hosts, format!("127.0.0.1 localhost\n::1 localhost\n127.0.0.1 {}\n", hostname))
         .map_err(|e| QckerError::Mount(format!("Failed to create hosts: {}", e)))?;
 
     Ok(())
@@ -125,14 +114,23 @@ mod tests {
     use super::*;
 
     #[test]
+    fn test_rootfs_config_default() {
+        let config = RootfsConfig::default();
+        assert!(config.skip_mounts);
+        assert_eq!(config.dns_servers, vec!["8.8.8.8", "8.8.4.4"]);
+    }
+
+    #[test]
     fn test_rootfs_config() {
         let config = RootfsConfig {
             container_dir: PathBuf::from("/tmp/test"),
             layers: vec![],
             rootless: false,
-            skip_mounts: false,
+            skip_mounts: true,
+            hostname: Some("myhost".to_string()),
+            dns_servers: vec!["1.1.1.1".to_string()],
         };
-        assert_eq!(config.container_dir, PathBuf::from("/tmp/test"));
-        assert!(config.layers.is_empty());
+        assert_eq!(config.hostname, Some("myhost".to_string()));
+        assert_eq!(config.dns_servers, vec!["1.1.1.1"]);
     }
 }

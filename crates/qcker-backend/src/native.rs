@@ -159,10 +159,32 @@ impl RuntimeBackend for NativeBackend {
             return Err("Container is not running".to_string());
         }
 
-        let output = Command::new(&command[0])
-            .args(&command[1..])
+        // Get container rootfs path
+        let container_dir = self.containers_dir.join(id);
+        let rootfs = container_dir.join("rootfs");
+
+        if !rootfs.exists() {
+            return Err(format!("Container rootfs not found: {}", rootfs.display()));
+        }
+
+        // Build nsenter command to enter container namespaces
+        let mut nsenter_args = vec![
+            "--target".to_string(),
+            container.pid.unwrap_or(0).to_string(),
+            "--mount".to_string(),
+            "--uts".to_string(),
+            "--ipc".to_string(),
+            "--net".to_string(),
+            "--pid".to_string(),
+            "--".to_string(),
+        ];
+        nsenter_args.extend_from_slice(command);
+
+        // Use nsenter to enter namespaces, then chroot
+        let output = Command::new("nsenter")
+            .args(&nsenter_args)
             .output()
-            .map_err(|e| format!("Failed to execute command: {}", e))?;
+            .map_err(|e| format!("Failed to exec in container: {}", e))?;
 
         Ok(ExecResult {
             exit_code: output.status.code().unwrap_or(-1),
