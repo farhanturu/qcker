@@ -6,6 +6,7 @@ pub mod exec;
 pub mod extension;
 pub mod images;
 pub mod kill;
+pub mod logs;
 pub mod network;
 pub mod ps;
 pub mod pull;

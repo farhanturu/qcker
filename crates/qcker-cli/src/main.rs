@@ -52,6 +52,7 @@ enum Commands {
     Compose(commands::compose::ComposeArgs),
     Extension(commands::extension::ExtensionArgs),
     Exec(commands::exec::ExecArgs),
+    Logs(commands::logs::LogsArgs),
 }
 
 #[tokio::main]
@@ -92,6 +93,7 @@ async fn main() -> anyhow::Result<()> {
                 Commands::Compose(args) => commands::compose::execute(args, &data_dir, &cli.format),
                 Commands::Extension(args) => commands::extension::execute(args, &data_dir, &cli.format),
                 Commands::Exec(args) => commands::exec::execute(args, &data_dir, &cli.format),
+                Commands::Logs(args) => commands::logs::execute(args, &data_dir, &cli.format),
             }
         }
         None => {
