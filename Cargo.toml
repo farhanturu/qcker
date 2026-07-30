@@ -14,7 +14,7 @@ version = "0.1.0"
 edition = "2021"
 license = "Apache-2.0"
 authors = ["Qcker Team"]
-repository = "https://github.com/qcker/qcker"
+repository = "https://github.com/farhanturu/qcker"
 
 [workspace.dependencies]
 # OCI Spec (from youki-dev)
@@ -39,7 +39,6 @@ hex = "0.4"
 nix = { version = "0.27", features = ["process", "sched", "mount", "signal", "term", "user", "ioctl", "fs", "hostname"] }
 libc = "0.2"
 capctl = "0.2"
-cgroups-rs = "0.3"
 
 # Filesystem
 tar = "0.4"
