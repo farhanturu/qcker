@@ -99,25 +99,13 @@ impl IpPool {
 
     pub fn allocate(&mut self) -> Result<String, String> {
         let max_hosts = 1u32 << (32 - self.prefix_len);
-        let start = self.next_index;
 
-        loop {
-            let offset = self.next_index;
-            self.next_index = (self.next_index + 1) % max_hosts;
-
-            if self.next_index == start {
-                return Err("IP pool exhausted".to_string());
-            }
-
-            if offset < 2 || offset >= max_hosts - 1 {
-                continue;
-            }
-
+        for offset in 2..max_hosts - 1 {
             let ip = [
                 self.base_ip[0],
                 self.base_ip[1],
-                (self.base_ip[2] as u32 + (offset >> 8)) as u8,
-                (self.base_ip[3] as u32 + (offset & 0xFF)) as u8,
+                self.base_ip[2],
+                (self.base_ip[3] as u32 + offset) as u8,
             ];
 
             if !self.allocated.contains(&ip) {
@@ -125,6 +113,8 @@ impl IpPool {
                 return Ok(format!("{}.{}.{}.{}", ip[0], ip[1], ip[2], ip[3]));
             }
         }
+
+        Err("IP pool exhausted".to_string())
     }
 
     pub fn release(&mut self, ip: &str) {
