@@ -1,8 +1,14 @@
 pub mod config;
+pub mod kernel;
+pub mod microvm;
 pub mod native;
+pub mod port_forward;
 pub mod protocol;
+pub mod rootfs;
 pub mod selector;
 pub mod types;
+pub mod vmm;
+pub mod vsock;
 
 use async_trait::async_trait;
 use std::collections::HashMap;
