@@ -1,7 +1,7 @@
 use std::collections::HashMap;
-use std::net::{Ipv4Addr, SocketAddrV4};
+use std::net::Ipv4Addr;
 
-use qcker_common::error::{QckerError, Result};
+use qcker_common::error::Result;
 
 pub struct PortForwarder {
     forwards: HashMap<u16, PortForward>,

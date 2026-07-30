@@ -1,4 +1,5 @@
 pub mod config;
+pub mod fs_share;
 pub mod kernel;
 pub mod microvm;
 pub mod native;

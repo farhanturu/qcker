@@ -1,5 +1,5 @@
 use serde::{Deserialize, Serialize};
-use std::io::{Read, Write};
+use std::io::Read;
 use std::os::unix::io::RawFd;
 
 use super::protocol::{deserialize_message, serialize_message, MAX_MESSAGE_SIZE};

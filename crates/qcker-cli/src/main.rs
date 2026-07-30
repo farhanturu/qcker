@@ -54,6 +54,7 @@ enum Commands {
     Exec(commands::exec::ExecArgs),
     Logs(commands::logs::LogsArgs),
     Stop(commands::stop::StopArgs),
+    System(commands::system::SystemArgs),
 }
 
 #[tokio::main]
@@ -96,6 +97,7 @@ async fn main() -> anyhow::Result<()> {
                 Commands::Exec(args) => commands::exec::execute(args, &data_dir, &cli.format),
                 Commands::Logs(args) => commands::logs::execute(args, &data_dir, &cli.format),
                 Commands::Stop(args) => commands::stop::execute(args, &data_dir, &cli.format),
+                Commands::System(args) => commands::system::execute(args, &data_dir, &cli.format),
             }
         }
         None => {

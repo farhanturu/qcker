@@ -1,15 +1,12 @@
 use std::collections::HashMap;
-use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 
 use async_trait::async_trait;
 
 use crate::config::BackendConfig;
-use crate::kernel::KernelManager;
 use crate::port_forward::PortForwarder;
-use crate::rootfs::RootfsManager;
 use crate::types::*;
-use crate::vmm::{self, VmmConfig, VmmManager};
+use crate::vmm::{self, VmmManager};
 use crate::RuntimeBackend;
 
 pub struct MicroVmBackend {
@@ -75,7 +72,7 @@ impl RuntimeBackend for MicroVmBackend {
     }
 
     async fn create_container(&self, id: &str, spec: &ContainerSpec) -> Result<ContainerInfo, String> {
-        let mut state = self.state.lock().map_err(|e| format!("Lock error: {}", e))?;
+        let state = self.state.lock().map_err(|e| format!("Lock error: {}", e))?;
 
         if state.status != BackendStatus::Running {
             return Err("VM is not running".to_string());
