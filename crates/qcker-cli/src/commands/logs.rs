@@ -1,7 +1,6 @@
 use clap::Args;
 use std::path::Path;
 
-use crate::output;
 
 #[derive(Args)]
 pub struct LogsArgs {

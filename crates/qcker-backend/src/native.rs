@@ -13,6 +13,12 @@ pub struct NativeBackend {
     containers_dir: PathBuf,
 }
 
+impl Default for NativeBackend {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl NativeBackend {
     pub fn new() -> Self {
         Self {
@@ -241,7 +247,7 @@ impl RuntimeBackend for NativeBackend {
     }
 
     async fn list_files(&self, id: &str, path: &str) -> Result<Vec<FileInfo>, String> {
-        let container = self.load_container_state(id)?;
+        let _container = self.load_container_state(id)?;
         let container_root = self.container_dir(id).join("rootfs");
         let target_path = container_root.join(path.trim_start_matches('/'));
 

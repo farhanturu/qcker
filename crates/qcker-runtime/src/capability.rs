@@ -84,7 +84,7 @@ pub fn apply_capabilities(caps: &OciCapabilities) -> Result<()> {
 }
 
 pub fn drop_all_capabilities() -> Result<()> {
-    let mut state = capctl::caps::CapState::empty();
+    let state = capctl::caps::CapState::empty();
     state.set_current()
         .map_err(|e| QckerError::Capability(format!("Failed to drop caps: {}", e)))?;
 

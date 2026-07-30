@@ -1,7 +1,6 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use nix::mount::{mount, MsFlags};
 use qcker_common::error::{QckerError, Result};
 
 use crate::mount as mount_module;

@@ -6,7 +6,6 @@ use std::path::{Path, PathBuf};
 
 use crate::capability;
 use crate::cgroup;
-use crate::namespace;
 use crate::seccomp;
 use crate::spec::{Container, ContainerState, OciConfig};
 use qcker_common::error::{QckerError, Result};

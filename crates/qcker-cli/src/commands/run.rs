@@ -102,7 +102,7 @@ pub fn execute(args: RunArgs, data_dir: &Path, format: &str) -> anyhow::Result<(
 
     let rootfs_path = if let Some(rootfs) = args.rootfs {
         rootfs
-    } else if let Some(image) = &args.image {
+    } else if let Some(_image) = &args.image {
         return Err(anyhow::anyhow!("--image support not yet implemented, use --rootfs"));
     } else {
         return Err(anyhow::anyhow!("Either --rootfs or --image must be specified"));
@@ -111,7 +111,7 @@ pub fn execute(args: RunArgs, data_dir: &Path, format: &str) -> anyhow::Result<(
     let mut env_vars = args.env.clone();
     env_vars.push("PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin".to_string());
 
-    let dns_servers = if args.dns.is_empty() {
+    let _dns_servers = if args.dns.is_empty() {
         vec!["8.8.8.8".to_string(), "8.8.4.4".to_string()]
     } else {
         args.dns.clone()

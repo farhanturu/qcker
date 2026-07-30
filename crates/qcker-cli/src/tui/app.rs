@@ -541,7 +541,7 @@ impl App {
         if self.editor_modified {
             if let Some(container_id) = &self.selected_container {
                 let rootfs = self.data_dir.join("containers").join(container_id).join("rootfs");
-                let file_path = rootfs.join(self.current_path.trim_start_matches('/'));
+                let _file_path = rootfs.join(self.current_path.trim_start_matches('/'));
 
                 if let Some(file) = self.files.get(self.selected_index) {
                     let full_path = rootfs.join(file.path.trim_start_matches('/'));

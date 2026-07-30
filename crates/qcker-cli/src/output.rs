@@ -50,7 +50,3 @@ pub fn print_container_list(containers: &[(String, String, Option<i32>)], format
 pub fn print_success(message: &str) {
     println!("{}", message);
 }
-
-pub fn print_error(message: &str) {
-    eprintln!("Error: {}", message);
-}
