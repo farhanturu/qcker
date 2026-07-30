@@ -62,7 +62,6 @@ pub fn remove_cgroup(cgroup_path: &Path) -> Result<()> {
 pub fn get_stats(cgroup_path: &Path) -> Result<CgroupStats> {
     let mut stats = CgroupStats::default();
 
-    // Memory current
     let memory_current_path = cgroup_path.join("memory.current");
     if memory_current_path.exists() {
         if let Ok(content) = fs::read_to_string(&memory_current_path) {
@@ -72,7 +71,6 @@ pub fn get_stats(cgroup_path: &Path) -> Result<CgroupStats> {
         }
     }
 
-    // Memory max
     let memory_max_path = cgroup_path.join("memory.max");
     if memory_max_path.exists() {
         if let Ok(content) = fs::read_to_string(&memory_max_path) {
@@ -85,7 +83,6 @@ pub fn get_stats(cgroup_path: &Path) -> Result<CgroupStats> {
         }
     }
 
-    // PIDs current
     let pids_current_path = cgroup_path.join("pids.current");
     if pids_current_path.exists() {
         if let Ok(content) = fs::read_to_string(&pids_current_path) {
@@ -95,7 +92,6 @@ pub fn get_stats(cgroup_path: &Path) -> Result<CgroupStats> {
         }
     }
 
-    // CPU stats from cpu.stat
     let cpu_stat_path = cgroup_path.join("cpu.stat");
     if cpu_stat_path.exists() {
         if let Ok(content) = fs::read_to_string(&cpu_stat_path) {
@@ -125,7 +121,6 @@ pub fn get_stats(cgroup_path: &Path) -> Result<CgroupStats> {
         }
     }
 
-    // IO stats
     let io_stat_path = cgroup_path.join("io.stat");
     if io_stat_path.exists() {
         if let Ok(content) = fs::read_to_string(&io_stat_path) {

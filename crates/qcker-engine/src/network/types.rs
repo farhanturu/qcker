@@ -85,7 +85,6 @@ impl IpPool {
         let base_ip = [ip_parts[0], ip_parts[1], ip_parts[2], ip_parts[3]];
         let mut allocated = HashSet::new();
 
-        // Reserve gateway (.1)
         let mut gw = base_ip;
         gw[3] += 1;
         allocated.insert(gw);

@@ -1,6 +1,6 @@
 use nix::pty::{openpty, OpenptyResult};
 use nix::sys::termios::{self, SetArg};
-use std::os::fd::{AsRawFd, BorrowedFd, RawFd};
+use std::os::fd::{AsRawFd, BorrowedFd, OwnedFd, RawFd};
 
 use qcker_common::error::{QckerError, Result};
 
@@ -11,8 +11,8 @@ pub enum TerminalMode {
 }
 
 pub struct Terminal {
-    pub master_fd: RawFd,
-    pub slave_fd: RawFd,
+    master: OwnedFd,
+    slave: OwnedFd,
     pub mode: TerminalMode,
 }
 
@@ -22,20 +22,27 @@ impl Terminal {
             openpty(None, None).map_err(|e| QckerError::Process(format!("Failed to open PTY: {}", e)))?;
 
         Ok(Self {
-            master_fd: master.as_raw_fd(),
-            slave_fd: slave.as_raw_fd(),
+            master,
+            slave,
             mode: TerminalMode::Interactive,
         })
     }
 
+    pub fn master_fd(&self) -> RawFd {
+        self.master.as_raw_fd()
+    }
+
+    pub fn slave_fd(&self) -> RawFd {
+        self.slave.as_raw_fd()
+    }
+
     pub fn set_raw_mode(&self) -> Result<()> {
-        let master_fd = unsafe { BorrowedFd::borrow_raw(self.master_fd) };
-        let mut termios = termios::tcgetattr(master_fd)
+        let mut termios = termios::tcgetattr(&self.master)
             .map_err(|e| QckerError::Process(format!("Failed to get terminal attrs: {}", e)))?;
 
         termios::cfmakeraw(&mut termios);
 
-        termios::tcsetattr(master_fd, SetArg::TCSANOW, &termios)
+        termios::tcsetattr(&self.master, SetArg::TCSANOW, &termios)
             .map_err(|e| QckerError::Process(format!("Failed to set terminal attrs: {}", e)))?;
 
         Ok(())
@@ -50,7 +57,7 @@ impl Terminal {
         };
 
         unsafe {
-            let ret = libc::ioctl(self.master_fd, libc::TIOCSWINSZ, &winsize);
+            let ret = libc::ioctl(self.master.as_raw_fd(), libc::TIOCSWINSZ, &winsize);
             if ret != 0 {
                 return Err(QckerError::Process(format!(
                     "Failed to resize terminal: {}",
@@ -60,19 +67,6 @@ impl Terminal {
         }
 
         Ok(())
-    }
-
-    pub fn slave_fd(&self) -> RawFd {
-        self.slave_fd
-    }
-}
-
-impl Drop for Terminal {
-    fn drop(&mut self) {
-        unsafe {
-            libc::close(self.master_fd);
-            libc::close(self.slave_fd);
-        }
     }
 }
 
@@ -95,7 +89,7 @@ pub fn proxy_terminal(master_fd: RawFd) -> Result<()> {
     loop {
         let mut poll_fds = [
             libc::pollfd {
-                fd: 0, // stdin
+                fd: 0,
                 events: libc::POLLIN,
                 revents: 0,
             },
@@ -151,5 +145,11 @@ mod tests {
     fn test_terminal_mode() {
         let mode = TerminalMode::Interactive;
         assert!(matches!(mode, TerminalMode::Interactive));
+    }
+
+    #[test]
+    fn test_terminal_creation() {
+        let terminal = Terminal::new();
+        assert!(terminal.is_ok());
     }
 }
