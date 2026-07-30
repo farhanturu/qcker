@@ -6,6 +6,7 @@ use std::path::{Path, PathBuf};
 
 use crate::capability;
 use crate::cgroup;
+use crate::mount;
 use crate::seccomp;
 use crate::spec::{Container, ContainerState, OciConfig};
 use qcker_common::error::{QckerError, Result};
@@ -13,6 +14,7 @@ use qcker_common::error::{QckerError, Result};
 pub struct ContainerProcess {
     pub container: Container,
     pub data_dir: PathBuf,
+    pub log_path: Option<PathBuf>,
 }
 
 #[derive(Debug, Clone)]
@@ -42,6 +44,24 @@ impl Default for ResourceLimits {
     }
 }
 
+fn close_unneeded_fds(keep_fds: &[i32]) -> Result<()> {
+    let fd_dir = std::fs::read_dir("/proc/self/fd")
+        .map_err(|e| QckerError::Process(format!("Failed to read /proc/self/fd: {}", e)))?;
+
+    for entry in fd_dir {
+        let entry = entry.map_err(|e| QckerError::Process(format!("Failed to read fd entry: {}", e)))?;
+        let fd_name = entry.file_name();
+        let fd_str = fd_name.to_string_lossy();
+        if let Ok(fd) = fd_str.parse::<i32>() {
+            if fd > 2 && !keep_fds.contains(&fd) {
+                unsafe { libc::close(fd); }
+            }
+        }
+    }
+
+    Ok(())
+}
+
 impl ContainerProcess {
     pub fn new(id: &str, bundle: &Path, config: OciConfig, data_dir: PathBuf) -> Result<Self> {
         let container = Container::new(id.to_string(), bundle.to_path_buf(), config);
@@ -56,7 +76,11 @@ impl ContainerProcess {
         fs::write(&state_path, state_json)
             .map_err(|e| QckerError::Process(format!("Failed to write state: {}", e)))?;
 
-        Ok(Self { container, data_dir })
+        Ok(Self { container, data_dir, log_path: None })
+    }
+
+    pub fn set_log_path(&mut self, path: PathBuf) {
+        self.log_path = Some(path);
     }
 
     pub fn create(&mut self) -> Result<()> {
@@ -117,7 +141,6 @@ impl ContainerProcess {
 
     fn child_process(&self, rootfs: &Path, process_config: &crate::spec::ProcessConfig) -> Result<()> {
         use nix::sched::{unshare, CloneFlags};
-        use nix::unistd::chroot;
 
         let use_user_ns = if let Some(ref linux) = self.container.config.linux {
             linux.namespaces.iter().any(|ns| ns.r#type == crate::spec::NamespaceType::User)
@@ -140,8 +163,6 @@ impl ContainerProcess {
 
             fs::write("/proc/self/gid_map", format!("0 {} 1", host_gid))
                 .map_err(|e| QckerError::Process(format!("Failed to write gid_map: {}", e)))?;
-
-            tracing::info!("User namespace created: uid_map=0:{}:1, gid_map=0:{}:1", host_uid, host_gid);
         }
 
         if let Some(ref linux) = self.container.config.linux {
@@ -154,7 +175,7 @@ impl ContainerProcess {
                     crate::spec::NamespaceType::Uts => flags |= CloneFlags::CLONE_NEWUTS,
                     crate::spec::NamespaceType::Ipc => flags |= CloneFlags::CLONE_NEWIPC,
                     crate::spec::NamespaceType::Cgroup => flags |= CloneFlags::CLONE_NEWCGROUP,
-                    crate::spec::NamespaceType::User => {} // Already handled above
+                    crate::spec::NamespaceType::User => {}
                 }
             }
             if !flags.is_empty() {
@@ -163,18 +184,36 @@ impl ContainerProcess {
             }
         }
 
-        chroot(rootfs)
-            .map_err(|e| QckerError::Process(format!("Failed to chroot: {}", e)))?;
+        let old_root = rootfs.join(".old_root");
+        mount::pivot_root(rootfs, &old_root)
+            .map_err(|e| QckerError::Process(format!("Failed to pivot_root: {}", e)))?;
 
         std::env::set_current_dir("/")
             .map_err(|e| QckerError::Process(format!("Failed to chdir: {}", e)))?;
+
+        mount::mount_proc(Path::new("/"))
+            .map_err(|e| QckerError::Process(format!("Failed to mount /proc: {}", e)))?;
+        mount::mount_sys(Path::new("/"))
+            .map_err(|e| QckerError::Process(format!("Failed to mount /sys: {}", e)))?;
+        mount::mount_dev(Path::new("/"))
+            .map_err(|e| QckerError::Process(format!("Failed to mount /dev: {}", e)))?;
+        mount::mount_proc_sys_readonly(Path::new("/"))
+            .map_err(|e| QckerError::Process(format!("Failed to mount /proc/sys read-only: {}", e)))?;
+        mount::mount_dev_shm(Path::new("/"))
+            .map_err(|e| QckerError::Process(format!("Failed to mount /dev/shm: {}", e)))?;
+        mount::mount_dev_mqueue(Path::new("/"))
+            .map_err(|e| QckerError::Process(format!("Failed to mount /dev/mqueue: {}", e)))?;
 
         let hostname = self.container.config.hostname.as_deref().unwrap_or(&self.container.id[..12.min(self.container.id.len())]);
         nix::unistd::sethostname(hostname)
             .map_err(|e| QckerError::Process(format!("Failed to set hostname: {}", e)))?;
 
-        let _ = seccomp::apply_default_profile();
-        let _ = capability::drop_all_capabilities();
+        if let Err(e) = seccomp::apply_default_profile() {
+            tracing::warn!("Seccomp filter not applied (may need root): {}", e);
+        }
+        if let Err(e) = capability::drop_all_capabilities() {
+            tracing::warn!("Capabilities not dropped (may need root): {}", e);
+        }
 
         for env in &process_config.env {
             let parts: Vec<&str> = env.splitn(2, '=').collect();
@@ -188,6 +227,19 @@ impl ContainerProcess {
         if process_config.args.is_empty() {
             return Err(QckerError::Process("No command specified".to_string()));
         }
+
+        if let Some(ref log_path) = self.log_path {
+            if let Ok(log_file) = fs::File::create(log_path) {
+                use std::os::unix::io::AsRawFd;
+                let fd = log_file.as_raw_fd();
+                unsafe {
+                    libc::dup2(fd, 1);
+                    libc::dup2(fd, 2);
+                }
+            }
+        }
+
+        close_unneeded_fds(&[])?;
 
         use std::ffi::CString;
         let cmd = &process_config.args[0];
@@ -502,14 +554,27 @@ impl ContainerProcess {
                     }
                 }
 
-                use nix::unistd::chroot;
-                let _ = chroot(rootfs.as_path());
+                let old_root = rootfs.join(".old_root");
+                let _ = mount::pivot_root(&rootfs, &old_root);
                 let _ = std::env::set_current_dir("/");
 
-                let _ = seccomp::apply_default_profile();
-                let _ = capability::drop_all_capabilities();
+                mount::mount_proc(Path::new("/")).ok();
+                mount::mount_sys(Path::new("/")).ok();
+                mount::mount_dev(Path::new("/")).ok();
+                mount::mount_proc_sys_readonly(Path::new("/")).ok();
+                mount::mount_dev_shm(Path::new("/")).ok();
+                mount::mount_dev_mqueue(Path::new("/")).ok();
+
+                if let Err(e) = seccomp::apply_default_profile() {
+                    tracing::warn!("Seccomp filter not applied (may need root): {}", e);
+                }
+                if let Err(e) = capability::drop_all_capabilities() {
+                    tracing::warn!("Capabilities not dropped (may need root): {}", e);
+                }
 
                 nix::unistd::close(pipe_write).ok();
+
+                close_unneeded_fds(&[])?;
 
                 use std::ffi::CString;
                 if !command.is_empty() {

@@ -147,6 +147,66 @@ pub fn mount_dev(rootfs: &Path) -> Result<()> {
     Ok(())
 }
 
+pub fn mount_proc_sys_readonly(rootfs: &Path) -> Result<()> {
+    let proc_sys_path = rootfs.join("proc/sys");
+    fs::create_dir_all(&proc_sys_path)
+        .map_err(|e| QckerError::Mount(format!("Failed to create /proc/sys: {}", e)))?;
+
+    mount(
+        Some(&proc_sys_path),
+        &proc_sys_path,
+        None::<&str>,
+        MsFlags::MS_BIND | MsFlags::MS_REC,
+        None::<&str>,
+    )
+    .map_err(|e| QckerError::Mount(format!("Failed to bind mount /proc/sys: {}", e)))?;
+
+    mount(
+        None::<&str>,
+        &proc_sys_path,
+        None::<&str>,
+        MsFlags::MS_BIND | MsFlags::MS_REMOUNT | MsFlags::MS_RDONLY,
+        None::<&str>,
+    )
+    .map_err(|e| QckerError::Mount(format!("Failed to remount /proc/sys read-only: {}", e)))?;
+
+    Ok(())
+}
+
+pub fn mount_dev_shm(rootfs: &Path) -> Result<()> {
+    let shm_path = rootfs.join("dev/shm");
+    fs::create_dir_all(&shm_path)
+        .map_err(|e| QckerError::Mount(format!("Failed to create /dev/shm: {}", e)))?;
+
+    mount(
+        Some("tmpfs"),
+        &shm_path,
+        Some("tmpfs"),
+        MsFlags::MS_NOEXEC | MsFlags::MS_NOSUID | MsFlags::MS_NODEV,
+        Some("mode=1777"),
+    )
+    .map_err(|e| QckerError::Mount(format!("Failed to mount /dev/shm: {}", e)))?;
+
+    Ok(())
+}
+
+pub fn mount_dev_mqueue(rootfs: &Path) -> Result<()> {
+    let mqueue_path = rootfs.join("dev/mqueue");
+    fs::create_dir_all(&mqueue_path)
+        .map_err(|e| QckerError::Mount(format!("Failed to create /dev/mqueue: {}", e)))?;
+
+    mount(
+        Some("mqueue"),
+        &mqueue_path,
+        Some("mqueue"),
+        MsFlags::MS_NOEXEC | MsFlags::MS_NOSUID | MsFlags::MS_NODEV,
+        None::<&str>,
+    )
+    .map_err(|e| QckerError::Mount(format!("Failed to mount /dev/mqueue: {}", e)))?;
+
+    Ok(())
+}
+
 fn create_dev_nodes(dev_path: &Path) -> Result<()> {
     use nix::sys::stat::{makedev, mknod, Mode, SFlag};
 

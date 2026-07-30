@@ -20,6 +20,7 @@ pub struct ContainerSpec {
     pub hostname: String,
     pub dns: Vec<String>,
     pub labels: HashMap<String, String>,
+    pub rootfs_path: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -75,6 +76,8 @@ pub struct ContainerInfo {
     pub exit_code: Option<i32>,
     pub created_at: String,
     pub labels: HashMap<String, String>,
+    pub rootfs_path: Option<String>,
+    pub log_path: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -161,6 +164,7 @@ impl Default for ContainerSpec {
             hostname: "container".to_string(),
             dns: vec!["8.8.8.8".to_string(), "8.8.4.4".to_string()],
             labels: HashMap::new(),
+            rootfs_path: None,
         }
     }
 }

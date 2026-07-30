@@ -87,6 +87,8 @@ impl RuntimeBackend for MicroVmBackend {
             exit_code: None,
             created_at: chrono::Utc::now().to_rfc3339(),
             labels: HashMap::new(),
+            rootfs_path: None,
+            log_path: None,
         };
 
         Ok(container)

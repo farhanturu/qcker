@@ -17,6 +17,7 @@ pub fn execute(args: DeleteArgs, data_dir: &Path, _format: &str) -> anyhow::Resu
     let mut process = ContainerProcess {
         container,
         data_dir: data_dir.to_path_buf(),
+        log_path: None,
     };
 
     if args.force && process.container.state == qcker_runtime::spec::ContainerState::Running {

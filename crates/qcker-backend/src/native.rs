@@ -3,6 +3,14 @@ use std::collections::HashMap;
 use std::fs;
 use std::path::PathBuf;
 use std::process::Command;
+use std::sync::{Arc, Mutex};
+
+use qcker_runtime::cgroup;
+use qcker_runtime::process::ContainerProcess;
+use qcker_runtime::spec::{
+    ContainerState, LinuxConfig, NamespaceConfig, NamespaceType, OciConfig, ProcessConfig,
+    RootConfig, UserConfig,
+};
 
 use crate::config::BackendConfig;
 use crate::types::*;
@@ -11,6 +19,8 @@ use crate::RuntimeBackend;
 pub struct NativeBackend {
     config: Option<BackendConfig>,
     containers_dir: PathBuf,
+    data_dir: PathBuf,
+    running_pids: Arc<Mutex<HashMap<String, u32>>>,
 }
 
 impl Default for NativeBackend {
@@ -24,6 +34,8 @@ impl NativeBackend {
         Self {
             config: None,
             containers_dir: PathBuf::new(),
+            data_dir: PathBuf::new(),
+            running_pids: Arc::new(Mutex::new(HashMap::new())),
         }
     }
 
@@ -33,6 +45,10 @@ impl NativeBackend {
 
     fn container_state_path(&self, id: &str) -> PathBuf {
         self.container_dir(id).join("state.json")
+    }
+
+    fn container_log_path(&self, id: &str) -> PathBuf {
+        self.container_dir(id).join("container.log")
     }
 
     fn load_container_state(&self, id: &str) -> Result<ContainerInfo, String> {
@@ -69,6 +85,89 @@ impl NativeBackend {
         }
         Ok(())
     }
+
+    fn build_oci_config(&self, container: &ContainerInfo, spec_path: &PathBuf) -> OciConfig {
+        let spec_content = fs::read_to_string(spec_path).ok();
+        let spec: Option<ContainerSpec> = spec_content
+            .and_then(|c| serde_json::from_str(&c).ok());
+
+        let rootfs_path = container.rootfs_path.clone().unwrap_or_else(|| {
+            self.container_dir(&container.id)
+                .join("rootfs")
+                .to_str()
+                .unwrap_or("rootfs")
+                .to_string()
+        });
+
+        let (args, env_vec, cwd) = if let Some(ref s) = spec {
+            let env_vec: Vec<String> = s
+                .env
+                .iter()
+                .map(|(k, v)| format!("{}={}", k, v))
+                .collect();
+            (
+                if s.command.is_empty() {
+                    vec!["/bin/sh".to_string()]
+                } else {
+                    s.command.clone()
+                },
+                env_vec,
+                s.working_dir.clone().unwrap_or_else(|| "/".to_string()),
+            )
+        } else {
+            (vec!["/bin/sh".to_string()], Vec::new(), "/".to_string())
+        };
+
+        let namespaces = vec![
+            NamespaceConfig {
+                r#type: NamespaceType::Pid,
+                path: None,
+            },
+            NamespaceConfig {
+                r#type: NamespaceType::Mount,
+                path: None,
+            },
+            NamespaceConfig {
+                r#type: NamespaceType::Uts,
+                path: None,
+            },
+            NamespaceConfig {
+                r#type: NamespaceType::Ipc,
+                path: None,
+            },
+            NamespaceConfig {
+                r#type: NamespaceType::Network,
+                path: None,
+            },
+        ];
+
+        OciConfig {
+            oci_version: "1.0.0".to_string(),
+            root: RootConfig {
+                path: PathBuf::from("rootfs"),
+                readonly: false,
+            },
+            process: Some(ProcessConfig {
+                terminal: false,
+                user: UserConfig { uid: 0, gid: 0 },
+                args,
+                env: env_vec,
+                cwd,
+                capabilities: None,
+                rlimits: vec![],
+                no_new_privileges: false,
+            }),
+            hostname: Some(container.id.chars().take(12).collect()),
+            mounts: vec![],
+            linux: Some(LinuxConfig {
+                namespaces,
+                resources: None,
+                uid_mappings: vec![],
+                gid_mappings: vec![],
+                seccomp: None,
+            }),
+        }
+    }
 }
 
 #[async_trait]
@@ -83,6 +182,7 @@ impl RuntimeBackend for NativeBackend {
 
     async fn initialize(&mut self, config: &BackendConfig) -> Result<(), String> {
         self.containers_dir = config.containers_dir();
+        self.data_dir = config.data_dir.clone();
         fs::create_dir_all(&self.containers_dir)
             .map_err(|e| format!("Failed to create containers dir: {}", e))?;
         self.config = Some(config.clone());
@@ -94,6 +194,22 @@ impl RuntimeBackend for NativeBackend {
     }
 
     async fn create_container(&self, id: &str, spec: &ContainerSpec) -> Result<ContainerInfo, String> {
+        let container_dir = self.container_dir(id);
+        fs::create_dir_all(&container_dir)
+            .map_err(|e| format!("Failed to create container dir: {}", e))?;
+
+        let spec_path = container_dir.join("spec.json");
+        let spec_content = serde_json::to_string_pretty(spec)
+            .map_err(|e| format!("Failed to serialize spec: {}", e))?;
+        fs::write(&spec_path, spec_content)
+            .map_err(|e| format!("Failed to write spec: {}", e))?;
+
+        let rootfs_path = spec.rootfs_path.clone().or_else(|| {
+            container_dir.join("rootfs").to_str().map(|s| s.to_string())
+        });
+
+        let log_path = self.container_log_path(id).to_str().map(|s| s.to_string());
+
         let container = ContainerInfo {
             id: id.to_string(),
             name: None,
@@ -103,6 +219,8 @@ impl RuntimeBackend for NativeBackend {
             exit_code: None,
             created_at: chrono::Utc::now().to_rfc3339(),
             labels: spec.labels.clone(),
+            rootfs_path,
+            log_path,
         };
 
         self.save_container_state(&container)?;
@@ -118,14 +236,97 @@ impl RuntimeBackend for NativeBackend {
             _ => return Err(format!("Container is in state {:?}, cannot start", container.status)),
         }
 
+        let container_dir = self.container_dir(id);
+        let spec_path = container_dir.join("spec.json");
+        let oci_config = self.build_oci_config(&container, &spec_path);
+
+        let rootfs_path = container.rootfs_path.clone().unwrap_or_else(|| {
+            container_dir.join("rootfs").to_str().unwrap_or("rootfs").to_string()
+        });
+        let rootfs = PathBuf::from(&rootfs_path);
+
+        if !rootfs.exists() {
+            return Err(format!("Container rootfs not found: {}", rootfs.display()));
+        }
+
+        let bundle = rootfs.parent().unwrap_or(&rootfs).to_path_buf();
+        let log_path = self.container_log_path(id);
+        let data_dir = self.data_dir.clone();
+        let id_owned = id.to_string();
+        let containers_dir = self.containers_dir.clone();
+        let running_pids = self.running_pids.clone();
+
+        let result = tokio::task::spawn_blocking(move || {
+            let mut proc = ContainerProcess::new(&id_owned, &bundle, oci_config, data_dir)
+                .map_err(|e| format!("Failed to create container process: {}", e))?;
+
+            proc.set_log_path(log_path);
+
+            proc.start()
+                .map_err(|e| format!("Failed to start container process: {}", e))?;
+
+            let pid = proc.container.pid.unwrap_or(0) as u32;
+
+            if let Ok(mut pids) = running_pids.lock() {
+                pids.insert(id_owned.clone(), pid);
+            }
+
+            if let Ok(cgroup_path) = cgroup::create_cgroup(&id_owned) {
+                let _ = cgroup::add_process(&cgroup_path, pid as i32);
+            }
+
+            Ok::<(u32, String), String>((pid, id_owned))
+        })
+        .await
+        .map_err(|e| format!("Spawn blocking task failed: {}", e))?
+        .map_err(|e| e)?;
+
+        container.pid = Some(result.0);
         container.status = ContainerStatus::Running;
         self.save_container_state(&container)?;
+
+        let monitor_id = id.to_string();
+        let monitor_containers_dir = self.containers_dir.clone();
+        let monitor_running_pids = self.running_pids.clone();
+
+        tokio::spawn(async move {
+            tokio::task::spawn_blocking(move || {
+                let pid = result.0 as i32;
+                loop {
+                    let check = unsafe { libc::kill(pid, 0) };
+                    if check != 0 {
+                        break;
+                    }
+                    std::thread::sleep(std::time::Duration::from_millis(100));
+                }
+
+                let state_path = monitor_containers_dir
+                    .join(&monitor_id)
+                    .join("state.json");
+                if state_path.exists() {
+                    if let Ok(content) = fs::read_to_string(&state_path) {
+                        if let Ok(mut info) = serde_json::from_str::<ContainerInfo>(&content) {
+                            info.status = ContainerStatus::Stopped;
+                            info.exit_code = Some(0);
+                            if let Ok(updated) = serde_json::to_string_pretty(&info) {
+                                let _ = fs::write(&state_path, updated);
+                            }
+                        }
+                    }
+                }
+
+                if let Ok(mut pids) = monitor_running_pids.lock() {
+                    pids.remove(&monitor_id);
+                }
+            })
+            .await
+        });
 
         Ok(())
     }
 
     async fn kill_container(&self, id: &str, signal: i32) -> Result<(), String> {
-        let container = self.load_container_state(id)?;
+        let mut container = self.load_container_state(id)?;
 
         if let Some(pid) = container.pid {
             unsafe {
@@ -137,6 +338,16 @@ impl RuntimeBackend for NativeBackend {
                     }
                 }
             }
+        }
+
+        container.status = ContainerStatus::Stopped;
+        if signal == libc::SIGKILL || signal == libc::SIGTERM {
+            container.exit_code = Some(128 + signal);
+        }
+        self.save_container_state(&container)?;
+
+        if let Ok(mut pids) = self.running_pids.lock() {
+            pids.remove(id);
         }
 
         Ok(())
@@ -152,6 +363,10 @@ impl RuntimeBackend for NativeBackend {
             } else {
                 return Err("Container is running. Use force=true to delete".to_string());
             }
+        }
+
+        if let Ok(cgroup_path) = cgroup::create_cgroup(id) {
+            let _ = cgroup::remove_cgroup(&cgroup_path);
         }
 
         self.delete_container_state(id)?;
@@ -199,6 +414,22 @@ impl RuntimeBackend for NativeBackend {
     async fn container_stats(&self, id: &str) -> Result<ContainerStats, String> {
         let _container = self.load_container_state(id)?;
 
+        let cgroup_path = std::path::Path::new("/sys/fs/cgroup/qcker").join(id);
+        if cgroup_path.exists() {
+            if let Ok(cgroup_stats) = cgroup::get_stats(&cgroup_path) {
+                return Ok(ContainerStats {
+                    cpu_usage_ns: cgroup_stats.cpu_usage_usec * 1000,
+                    memory_usage_bytes: cgroup_stats.memory_current,
+                    memory_limit_bytes: cgroup_stats.memory_limit,
+                    network_rx_bytes: 0,
+                    network_tx_bytes: 0,
+                    block_read_bytes: 0,
+                    block_write_bytes: 0,
+                    pids: cgroup_stats.pids_current as u64,
+                });
+            }
+        }
+
         Ok(ContainerStats {
             cpu_usage_ns: 0,
             memory_usage_bytes: 0,
@@ -236,9 +467,40 @@ impl RuntimeBackend for NativeBackend {
         Ok(containers)
     }
 
-    async fn container_logs(&self, id: &str, _opts: &LogReadOpts) -> Result<Vec<LogEntry>, String> {
-        let _container = self.load_container_state(id)?;
-        Ok(Vec::new())
+    async fn container_logs(&self, id: &str, opts: &LogReadOpts) -> Result<Vec<LogEntry>, String> {
+        let container = self.load_container_state(id)?;
+
+        let log_path = container.log_path.as_deref().map(PathBuf::from)
+            .unwrap_or_else(|| self.container_log_path(id));
+
+        if !log_path.exists() {
+            return Ok(Vec::new());
+        }
+
+        let content = fs::read_to_string(&log_path)
+            .map_err(|e| format!("Failed to read log file: {}", e))?;
+
+        let mut entries: Vec<LogEntry> = Vec::new();
+
+        for line in content.lines() {
+            let entry = LogEntry {
+                timestamp: chrono::Utc::now().to_rfc3339(),
+                stream: LogStream::Stdout,
+                message: line.to_string(),
+            };
+            entries.push(entry);
+        }
+
+        if let Some(tail) = opts.tail {
+            let start = if entries.len() > tail {
+                entries.len() - tail
+            } else {
+                0
+            };
+            entries = entries[start..].to_vec();
+        }
+
+        Ok(entries)
     }
 
     async fn shutdown(&mut self) -> Result<(), String> {

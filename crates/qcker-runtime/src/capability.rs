@@ -2,6 +2,10 @@ use capctl::caps::CapSet;
 
 use qcker_common::error::{QckerError, Result};
 
+const PR_CAPBSET_DROP: i32 = 24;
+const PR_CAP_AMBIENT: i32 = 47;
+const PR_CAP_AMBIENT_RAISE: i32 = 1;
+
 fn cap_from_name(name: &str) -> Option<capctl::caps::Cap> {
     match name {
         "CAP_CHOWN" => Some(capctl::caps::Cap::CHOWN),
@@ -68,7 +72,93 @@ fn names_to_set(names: &[String]) -> CapSet {
     set
 }
 
+fn drop_from_bounding_set(caps: &CapSet) -> Result<()> {
+    let all_caps = [
+        capctl::caps::Cap::CHOWN,
+        capctl::caps::Cap::DAC_OVERRIDE,
+        capctl::caps::Cap::DAC_READ_SEARCH,
+        capctl::caps::Cap::FOWNER,
+        capctl::caps::Cap::FSETID,
+        capctl::caps::Cap::KILL,
+        capctl::caps::Cap::SETGID,
+        capctl::caps::Cap::SETUID,
+        capctl::caps::Cap::SETPCAP,
+        capctl::caps::Cap::LINUX_IMMUTABLE,
+        capctl::caps::Cap::NET_BIND_SERVICE,
+        capctl::caps::Cap::NET_BROADCAST,
+        capctl::caps::Cap::NET_ADMIN,
+        capctl::caps::Cap::NET_RAW,
+        capctl::caps::Cap::IPC_LOCK,
+        capctl::caps::Cap::IPC_OWNER,
+        capctl::caps::Cap::SYS_MODULE,
+        capctl::caps::Cap::SYS_RAWIO,
+        capctl::caps::Cap::SYS_CHROOT,
+        capctl::caps::Cap::SYS_PTRACE,
+        capctl::caps::Cap::SYS_PACCT,
+        capctl::caps::Cap::SYS_ADMIN,
+        capctl::caps::Cap::SYS_BOOT,
+        capctl::caps::Cap::SYS_NICE,
+        capctl::caps::Cap::SYS_RESOURCE,
+        capctl::caps::Cap::SYS_TIME,
+        capctl::caps::Cap::SYS_TTY_CONFIG,
+        capctl::caps::Cap::MKNOD,
+        capctl::caps::Cap::LEASE,
+        capctl::caps::Cap::AUDIT_WRITE,
+        capctl::caps::Cap::AUDIT_CONTROL,
+        capctl::caps::Cap::SETFCAP,
+        capctl::caps::Cap::MAC_OVERRIDE,
+        capctl::caps::Cap::MAC_ADMIN,
+        capctl::caps::Cap::SYSLOG,
+        capctl::caps::Cap::WAKE_ALARM,
+        capctl::caps::Cap::BLOCK_SUSPEND,
+        capctl::caps::Cap::AUDIT_READ,
+        capctl::caps::Cap::PERFMON,
+        capctl::caps::Cap::BPF,
+        capctl::caps::Cap::CHECKPOINT_RESTORE,
+    ];
+
+    for cap in &all_caps {
+        if !caps.has(*cap) {
+            let cap_val = *cap as u64;
+            unsafe {
+                let ret = libc::prctl(PR_CAPBSET_DROP, cap_val, 0, 0, 0);
+                if ret != 0 {
+                    let err = std::io::Error::last_os_error();
+                    if err.raw_os_error() != Some(libc::EPERM) {
+                        return Err(QckerError::Capability(format!(
+                            "Failed to drop cap from bounding set: {}",
+                            err
+                        )));
+                    }
+                }
+            }
+        }
+    }
+
+    Ok(())
+}
+
+fn set_ambient_capabilities(caps: &[String]) -> Result<()> {
+    for name in caps {
+        if let Some(cap) = cap_from_name(name) {
+            let cap_val = cap as u64;
+            unsafe {
+                let ret = libc::prctl(PR_CAP_AMBIENT, PR_CAP_AMBIENT_RAISE, cap_val, 0, 0);
+                if ret != 0 {
+                    let err = std::io::Error::last_os_error();
+                    if err.raw_os_error() != Some(libc::EINVAL) {
+                        tracing::warn!("Failed to set ambient capability {}: {}", name, err);
+                    }
+                }
+            }
+        }
+    }
+    Ok(())
+}
+
 pub fn apply_capabilities(caps: &OciCapabilities) -> Result<()> {
+    let bounding_set = names_to_set(&caps.bounding);
+
     let mut state = capctl::caps::CapState::get_current()
         .map_err(|e| QckerError::Capability(format!("Failed to get current caps: {}", e)))?;
 
@@ -79,7 +169,10 @@ pub fn apply_capabilities(caps: &OciCapabilities) -> Result<()> {
     state.set_current()
         .map_err(|e| QckerError::Capability(format!("Failed to set caps: {}", e)))?;
 
-    tracing::info!("Capabilities applied");
+    drop_from_bounding_set(&bounding_set)?;
+
+    set_ambient_capabilities(&caps.ambient)?;
+
     Ok(())
 }
 
@@ -88,6 +181,9 @@ pub fn drop_all_capabilities() -> Result<()> {
     state.set_current()
         .map_err(|e| QckerError::Capability(format!("Failed to drop caps: {}", e)))?;
 
+    let empty_set = CapSet::empty();
+    drop_from_bounding_set(&empty_set)?;
+
     let verify = capctl::caps::CapState::get_current()
         .map_err(|e| QckerError::Capability(format!("Failed to verify caps: {}", e)))?;
 
@@ -95,7 +191,6 @@ pub fn drop_all_capabilities() -> Result<()> {
         return Err(QckerError::Capability("Failed to verify capability drop".to_string()));
     }
 
-    tracing::info!("All capabilities dropped");
     Ok(())
 }
 

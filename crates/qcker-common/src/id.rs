@@ -1,16 +1,11 @@
 use sha2::{Digest, Sha256};
-use std::time::{SystemTime, UNIX_EPOCH};
 
 pub fn generate_container_id() -> String {
-    let timestamp = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .unwrap()
-        .as_nanos();
-
+    let mut random_bytes = [0u8; 32];
+    getrandom::getrandom(&mut random_bytes)
+        .expect("Failed to generate random bytes for container ID");
     let mut hasher = Sha256::new();
-    hasher.update(timestamp.to_string().as_bytes());
-    hasher.update(b"qcker-container");
-    hasher.update(b"random-salt-here");
+    hasher.update(&random_bytes);
     let hash = hasher.finalize();
     hex::encode(hash)
 }
@@ -23,27 +18,21 @@ pub fn generate_image_id(content: &[u8]) -> String {
 }
 
 pub fn generate_network_id() -> String {
-    let timestamp = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .unwrap()
-        .as_nanos();
-
+    let mut random_bytes = [0u8; 16];
+    getrandom::getrandom(&mut random_bytes)
+        .expect("Failed to generate random bytes for network ID");
     let mut hasher = Sha256::new();
-    hasher.update(timestamp.to_string().as_bytes());
-    hasher.update(b"qcker-network");
+    hasher.update(&random_bytes);
     let hash = hasher.finalize();
     hex::encode(&hash[..16])
 }
 
 pub fn generate_volume_id() -> String {
-    let timestamp = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .unwrap()
-        .as_nanos();
-
+    let mut random_bytes = [0u8; 16];
+    getrandom::getrandom(&mut random_bytes)
+        .expect("Failed to generate random bytes for volume ID");
     let mut hasher = Sha256::new();
-    hasher.update(timestamp.to_string().as_bytes());
-    hasher.update(b"qcker-volume");
+    hasher.update(&random_bytes);
     let hash = hasher.finalize();
     hex::encode(&hash[..16])
 }

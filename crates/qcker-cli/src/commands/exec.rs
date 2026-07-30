@@ -27,6 +27,7 @@ pub fn execute(args: ExecArgs, data_dir: &Path, format: &str) -> anyhow::Result<
     let process = ContainerProcess {
         container: container_state,
         data_dir: data_dir.to_path_buf(),
+        log_path: None,
     };
 
     process.exec(&args.command)?;

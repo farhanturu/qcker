@@ -19,3 +19,4 @@ tempfile = { workspace = true }
 tracing = { workspace = true }
 libc = { workspace = true }
 nix = { workspace = true }
+getrandom = "0.2"

@@ -14,6 +14,7 @@ pub fn execute(args: StartArgs, data_dir: &Path, format: &str) -> anyhow::Result
     let mut process = ContainerProcess {
         container,
         data_dir: data_dir.to_path_buf(),
+        log_path: None,
     };
 
     process.start()?;

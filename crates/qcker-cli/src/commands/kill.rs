@@ -18,6 +18,7 @@ pub fn execute(args: KillArgs, data_dir: &Path, _format: &str) -> anyhow::Result
     let process = ContainerProcess {
         container,
         data_dir: data_dir.to_path_buf(),
+        log_path: None,
     };
 
     let signal = match args.signal.as_str() {

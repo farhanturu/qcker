@@ -89,16 +89,16 @@ fn create_essential_files(rootfs: &Path, config: &RootfsConfig) -> Result<()> {
 
 pub fn extract_layers(layers: &[PathBuf], dest: &Path) -> Result<()> {
     for layer in layers {
-        qcker_common::tar::extract_tar_gz(layer, dest)?;
+        qcker_common::tar::safe_extract_gz(layer, dest)?;
     }
     Ok(())
 }
 
 pub fn enter_rootfs(rootfs: &Path, _rootless: bool) -> Result<()> {
-    use nix::unistd::chroot;
+    let old_root = rootfs.join(".old_root");
 
-    chroot(rootfs)
-        .map_err(|e| QckerError::Mount(format!("Failed to chroot: {}", e)))?;
+    mount_module::pivot_root(rootfs, &old_root)?;
+
     std::env::set_current_dir("/")
         .map_err(|e| QckerError::Mount(format!("Failed to chdir to /: {}", e)))?;
 

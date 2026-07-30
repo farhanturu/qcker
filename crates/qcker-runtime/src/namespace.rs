@@ -1,4 +1,4 @@
-use nix::sched::{unshare, CloneFlags};
+use nix::sched::CloneFlags;
 use std::fs;
 use std::path::Path;
 
@@ -24,7 +24,7 @@ pub fn setup_namespaces(namespaces: &[NamespaceConfig], rootless: bool) -> Resul
         }
     }
 
-    unshare(flags).map_err(|e| QckerError::Namespace(format!("Failed to unshare: {}", e)))?;
+    nix::sched::unshare(flags).map_err(|e| QckerError::Namespace(format!("Failed to unshare: {}", e)))?;
 
     Ok(())
 }
@@ -96,8 +96,28 @@ fn ns_type_name(ns_type: &NamespaceType) -> &'static str {
 }
 
 pub fn user_namespaces_supported() -> bool {
-    let flags = CloneFlags::CLONE_NEWUSER;
-    unshare(flags).is_ok()
+    let path = Path::new("/proc/sys/kernel/unprivileged_userns_clone");
+    if path.exists() {
+        if let Ok(content) = fs::read_to_string(path) {
+            let trimmed = content.trim();
+            return trimmed == "1" || trimmed == "Y" || trimmed == "y";
+        }
+    }
+
+    match unsafe { libc::fork() } {
+        0 => {
+            let ret = unsafe { libc::syscall(libc::SYS_unshare, CloneFlags::CLONE_NEWUSER.bits()) };
+            unsafe { libc::_exit(if ret == 0 { 0 } else { 1 }); }
+        }
+        -1 => false,
+        pid => {
+            let mut status: i32 = 0;
+            unsafe {
+                libc::waitpid(pid, &mut status, 0);
+            }
+            libc::WIFEXITED(status) && libc::WEXITSTATUS(status) == 0
+        }
+    }
 }
 
 #[cfg(test)]
