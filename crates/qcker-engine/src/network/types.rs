@@ -1,4 +1,5 @@
 use serde::{Deserialize, Serialize};
+use std::collections::HashSet;
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub enum NetworkDriver {
@@ -54,6 +55,89 @@ pub struct NetworkDetail {
     pub config: NetworkConfig,
     pub containers: Vec<ContainerNetworkConfig>,
     pub created_at: String,
+}
+
+pub struct IpPool {
+    base_ip: [u8; 4],
+    prefix_len: u8,
+    allocated: HashSet<[u8; 4]>,
+    next_index: u32,
+}
+
+impl IpPool {
+    pub fn new(subnet: &str) -> Result<Self, String> {
+        let parts: Vec<&str> = subnet.split('/').collect();
+        if parts.len() != 2 {
+            return Err(format!("Invalid subnet: {}", subnet));
+        }
+
+        let ip_parts: Vec<u8> = parts[0]
+            .split('.')
+            .filter_map(|p| p.parse().ok())
+            .collect();
+
+        if ip_parts.len() != 4 {
+            return Err(format!("Invalid IP: {}", parts[0]));
+        }
+
+        let prefix_len: u8 = parts[1].parse().map_err(|_| "Invalid prefix")?;
+
+        let base_ip = [ip_parts[0], ip_parts[1], ip_parts[2], ip_parts[3]];
+        let mut allocated = HashSet::new();
+
+        // Reserve gateway (.1)
+        let mut gw = base_ip;
+        gw[3] += 1;
+        allocated.insert(gw);
+
+        Ok(Self {
+            base_ip,
+            prefix_len,
+            allocated,
+            next_index: 2,
+        })
+    }
+
+    pub fn allocate(&mut self) -> Result<String, String> {
+        let max_hosts = 1u32 << (32 - self.prefix_len);
+        let start = self.next_index;
+
+        loop {
+            let offset = self.next_index;
+            self.next_index = (self.next_index + 1) % max_hosts;
+
+            if self.next_index == start {
+                return Err("IP pool exhausted".to_string());
+            }
+
+            if offset < 2 || offset >= max_hosts - 1 {
+                continue;
+            }
+
+            let ip = [
+                self.base_ip[0],
+                self.base_ip[1],
+                (self.base_ip[2] as u32 + (offset >> 8)) as u8,
+                (self.base_ip[3] as u32 + (offset & 0xFF)) as u8,
+            ];
+
+            if !self.allocated.contains(&ip) {
+                self.allocated.insert(ip);
+                return Ok(format!("{}.{}.{}.{}", ip[0], ip[1], ip[2], ip[3]));
+            }
+        }
+    }
+
+    pub fn release(&mut self, ip: &str) {
+        let parts: Vec<u8> = ip.split('.').filter_map(|p| p.parse().ok()).collect();
+        if parts.len() == 4 {
+            self.allocated.remove(&[parts[0], parts[1], parts[2], parts[3]]);
+        }
+    }
+
+    pub fn allocated_count(&self) -> usize {
+        self.allocated.len()
+    }
 }
 
 impl NetworkConfig {
@@ -184,5 +268,25 @@ mod tests {
     fn test_compute_gateway() {
         assert_eq!(compute_gateway("172.20.0.0/16"), "172.20.0.1");
         assert_eq!(compute_gateway("10.0.0.0/24"), "10.0.0.1");
+    }
+
+    #[test]
+    fn test_ip_pool() {
+        let mut pool = IpPool::new("172.20.0.0/24").unwrap();
+        assert_eq!(pool.allocated_count(), 1); // gateway reserved
+
+        let ip1 = pool.allocate().unwrap();
+        assert_eq!(ip1, "172.20.0.2");
+        assert_eq!(pool.allocated_count(), 2);
+
+        let ip2 = pool.allocate().unwrap();
+        assert_eq!(ip2, "172.20.0.3");
+        assert_eq!(pool.allocated_count(), 3);
+
+        pool.release(&ip1);
+        assert_eq!(pool.allocated_count(), 2);
+
+        let ip3 = pool.allocate().unwrap();
+        assert_eq!(ip3, "172.20.0.2"); // Reuses released IP
     }
 }

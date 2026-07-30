@@ -13,6 +13,7 @@ pub mod pull;
 pub mod run;
 pub mod start;
 pub mod state;
+pub mod stats;
 pub mod stop;
 pub mod system;
 pub mod volume;
