@@ -1,25 +1,16 @@
-<p align="center">
-  <img src="logo.png" alt="Qcker Logo" width="600">
-</p>
+# Qcker
 
-<h1 align="center">Qcker</h1>
+**A daemonless, rootless container engine written in Rust.**
 
-<p align="center">
-  <strong>A daemonless, rootless container engine written in Rust</strong>
-</p>
+[![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
+[![Rust](https://img.shields.io/badge/Rust-1.70%2B-orange.svg)](https://www.rust-lang.org/)
+[![Tests](https://img.shields.io/badge/tests-50%20passed-brightgreen.svg)]()
+[![Docker](https://img.shields.io/badge/Docker-alternative-blue.svg)]()
+[![OCI](https://img.shields.io/badge/OCI-compliant-green.svg)]()
 
-<p align="center">
-  <a href="https://opensource.org/licenses/Apache-2.0"><img src="https://img.shields.io/badge/License-Apache_2.0-blue.svg" alt="License"></a>
-  <a href="https://www.rust-lang.org/"><img src="https://img.shields.io/badge/Rust-1.70%2B-orange.svg" alt="Rust"></a>
-  <a href="#"><img src="https://img.shields.io/badge/tests-50%20passed-brightgreen.svg" alt="Tests"></a>
-  <a href="#"><img src="https://img.shields.io/badge/version-0.1.0-blue.svg" alt="Version"></a>
-</p>
+Qcker is a lightweight, high-performance alternative to Docker. It runs containers without a background daemon, uses less memory, starts faster, and has a smaller binary footprint. Built with Rust for safety and speed.
 
-<p align="center">
-  Qcker is a lightweight, high-performance alternative to Docker.
-  <br>
-  No daemon. No bloat. Just containers.
-</p>
+**Production by PaongLabs**
 
 ---
 
@@ -29,29 +20,52 @@
   <img src="tui-demo.png" alt="Qcker TUI Demo" width="800">
 </p>
 
+The TUI provides a visual dashboard for managing containers, browsing files, editing configs, and managing extensions.
+
 ---
 
-## What is Qcker?
-
-Qcker is a container engine that runs Linux containers without a background daemon. It is written in Rust for safety and speed, and is fully OCI-compliant so it can run existing Docker images.
-
-**Key differences from Docker:**
+## Why Qcker over Docker?
 
 | | Docker | Qcker |
 |---|---|---|
-| Daemon | Yes (dockerd, 100-300MB RAM) | None |
-| Binary size | ~200 MB | ~7 MB |
-| Container startup | ~1.2s | <200ms |
-| Rootless by default | No | Yes |
-| Language | Go | Rust |
-| Built-in TUI | No | Yes |
-| GPU support | Manual | Built-in |
+| **Binary size** | ~200 MB | **~7 MB** |
+| **Daemon memory** | 100-300 MB | **0 MB (no daemon)** |
+| **Container startup** | ~1.2s | **<200ms** |
+| **Rootless by default** | No | **Yes** |
+| **Language** | Go | **Rust** |
+| **TUI built-in** | No | **Yes** |
+| **GPU support** | Manual | **Built-in flag** |
+| **Extension system** | Limited | **Full SDK** |
+| **Error handling** | Generic | **Error codes + suggestions** |
+
+---
+
+## MicroVM Support
+
+Qcker includes a MicroVM backend for running containers on macOS and Windows without a full Docker Desktop installation.
+
+**How it works:**
+- On Linux: Uses native namespaces and cgroups (no VM needed)
+- On macOS/Windows: Spawns a minimal MicroVM via QEMU
+- The MicroVM runs qcker-runtime as PID 1 (init process)
+- Communication via vsock (zero-overhead kernel channel)
+- Single VM shared by all containers (not per-container)
+- Auto-shutdown after idle timeout
+
+**MicroVM vs Docker Desktop:**
+
+| | Docker Desktop | Qcker MicroVM |
+|---|---|---|
+| Install size | ~1.5 GB | **~7 MB** |
+| RAM idle | 500+ MB | **~30 MB** |
+| Boot time | 10-30s | **<200ms** |
+| Full Linux distro | Yes | **No** |
 
 ---
 
 ## Quick Start
 
-### Build
+### Build from source
 
 ```bash
 git clone https://github.com/farhanturu/qcker.git
@@ -89,34 +103,47 @@ sudo ./target/release/qcker run --rootfs /path/to/rootfs \
 
 ## Features
 
-**Container Management**
+### Container Management
 - Create, start, stop, kill, delete containers
 - List running and stopped containers
 - Execute commands inside running containers
 - Container logs and state inspection
+- Real-time stats (CPU, memory, PIDs)
 
-**Resource Limits**
+### Resource Limits
 - `--cpus <cores>` - CPU cores (e.g., 1.5)
 - `--memory <MB>` - Memory limit
 - `--pids-limit <n>` - Max processes
 - `--gpu` - Enable GPU access
 - `--vram <MB>` - VRAM limit
 
-**Security**
+### Security
 - Rootless by default
 - PID, network, mount, UTS, IPC, cgroup namespace isolation
-- Seccomp syscall filtering
-- Capability dropping
+- Seccomp syscall filtering (31 blocked syscalls)
+- Capability dropping (all caps removed by default)
 - Read-only rootfs option
 
-**TUI (Terminal UI)**
-- 8 tabs: Containers, Images, Networks, Volumes, Files, Editor, Marketplace, Logs
-- Browse and edit files inside containers
-- Manage extensions
+### Error Handling
+- Unique error codes (Q-C001, Q-I001, etc.)
+- Source location tracking
+- Suggestions for fixing errors
+- JSON output for scripting
+- Retryable error detection
 
-**Docker-Compatible CLI**
+### TUI (Terminal UI)
+- 8 tabs: Containers, Images, Networks, Volumes, Stats, Logs, Extensions, Marketplace
+- Browse and edit files inside containers
+- Real-time stats with CPU/memory bars
+- Theme system (dark, dracula)
+- Mouse support
+- Auto-refresh
+
+### Docker-Compatible CLI
 - `qcker run`, `qcker ps`, `qcker images`, `qcker build`, `qcker exec`
 - `qcker network`, `qcker volume`, `qcker compose`, `qcker extension`
+- `qcker stats`, `qcker logs`, `qcker stop`
+- `qcker system info/prune`
 
 ---
 
@@ -135,40 +162,45 @@ sudo ./target/release/qcker run --rootfs /path/to/rootfs \
 | `qcker images` | List images |
 | `qcker build` | Build from Dockerfile |
 | `qcker pull` | Pull image from registry |
+| `qcker logs` | View container logs |
+| `qcker stats` | View container stats |
 | `qcker network` | Manage networks |
 | `qcker volume` | Manage volumes |
 | `qcker compose` | Manage compose apps |
 | `qcker extension` | Manage extensions |
+| `qcker system` | System info and prune |
 
 ---
 
 ## Architecture
 
 ```
-qcker
-├── qcker-cli          CLI binary + TUI
-├── qcker-runtime      OCI runtime (namespaces, cgroups, seccomp)
-├── qcker-backend      Runtime backend abstraction
-├── qcker-engine       Image, build, network, volume, compose, extension
-├── qcker-common       Shared utilities
-└── qcker-ext-api      Extension SDK
+qcker/
+├── crates/
+│   ├── qcker-cli/          # CLI binary + TUI
+│   ├── qcker-runtime/      # OCI runtime (namespaces, cgroups, seccomp)
+│   ├── qcker-backend/      # Runtime backend (native, MicroVM)
+│   ├── qcker-engine/       # Image, build, network, volume, compose, extension
+│   ├── qcker-common/       # Shared utilities
+│   ├── qcker-error/        # Error library with codes and suggestions
+│   └── qcker-ext-api/      # Extension SDK
+└── target/release/qcker    # Single binary (~7 MB)
 ```
 
-How it works:
+### Runtime Backends
 
-1. CLI parses commands and builds OCI runtime specs
-2. Engine manages images, networks, volumes, extensions
-3. Runtime creates containers using Linux kernel primitives:
-   - `clone()` with namespace flags for isolation
-   - `chroot()` for filesystem isolation
-   - cgroups v2 for resource limits
-   - seccomp for syscall filtering
+| Backend | Platform | Description |
+|---------|----------|-------------|
+| NativeBackend | Linux | Direct namespace/cgroup usage |
+| MicroVmBackend | macOS/Windows | QEMU-based MicroVM |
+
+Backend selection is automatic based on platform.
 
 ---
 
 ## Extensions
 
-Qcker has a first-class extension system for custom networking, storage, security, and more.
+Browse and manage extensions in the TUI Marketplace tab.
 
 | Extension | Category | Status |
 |-----------|----------|--------|
@@ -180,7 +212,7 @@ Qcker has a first-class extension system for custom networking, storage, securit
 | loki | logging | Available |
 | buildkit | build | Available |
 
-Browse and request extensions: https://github.com/farhanturu/qcker-extensions
+Request new extensions: https://github.com/farhanturu/qcker-extensions/issues
 
 ---
 
@@ -195,14 +227,16 @@ Browse and request extensions: https://github.com/farhanturu/qcker-extensions
 | TUI | No | No | Yes |
 | GPU support | Manual | Manual | Built-in |
 | Extensions | Limited | Limited | Full SDK |
+| Error codes | No | No | Yes |
+| MicroVM | No | No | Yes |
 
 ---
 
 ## Requirements
 
-- Linux kernel 5.3+
+- Linux kernel 5.3+ (for native backend)
+- QEMU (for MicroVM backend on macOS/Windows)
 - Rust 1.70+ (for building)
-- Root access or user namespace support
 
 ---
 
@@ -232,4 +266,4 @@ Apache License 2.0 - see [LICENSE](LICENSE)
 
 ## Tags
 
-docker, docker-alternative, container, container-engine, container-runtime, rust, oci, rootless, daemonless, linux, namespaces, cgroups, podman, podman-alternative, kubernetes, k8s, devops, gpu, tui, lightweight-containers, fast-containers, container-tools, docker-replacement, docker-desktop-alternative
+docker, docker-alternative, container, container-engine, container-runtime, rust, oci, rootless, daemonless, linux, namespaces, cgroups, podman, podman-alternative, kubernetes, k8s, devops, gpu, tui, microvm, qemu, virtualization, docker-desktop-alternative, lightweight-containers, fast-containers, container-tools, docker-replacement
