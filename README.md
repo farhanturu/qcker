@@ -1,16 +1,30 @@
-# Qcker
+<p align="center">
+  <img src="logo.png" alt="Qcker Logo" width="600">
+</p>
 
-**A daemonless, rootless container engine written in Rust.**
+<h1 align="center">Qcker</h1>
 
-[![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
-[![Rust](https://img.shields.io/badge/Rust-1.70%2B-orange.svg)](https://www.rust-lang.org/)
-[![Tests](https://img.shields.io/badge/tests-50%20passed-brightgreen.svg)]()
-[![Docker](https://img.shields.io/badge/Docker-alternative-blue.svg)]()
-[![OCI](https://img.shields.io/badge/OCI-compliant-green.svg)]()
+<p align="center">
+  <strong>A daemonless, rootless container engine written in Rust</strong>
+</p>
 
-Qcker is a lightweight, high-performance alternative to Docker. It runs containers without a background daemon, uses less memory, starts faster, and has a smaller binary footprint. Built with Rust for safety and speed.
+<p align="center">
+  <a href="https://opensource.org/licenses/Apache-2.0"><img src="https://img.shields.io/badge/License-Apache_2.0-blue.svg" alt="License"></a>
+  <a href="https://www.rust-lang.org/"><img src="https://img.shields.io/badge/Rust-1.70%2B-orange.svg" alt="Rust"></a>
+  <a href="#"><img src="https://img.shields.io/badge/tests-50%20passed-brightgreen.svg" alt="Tests"></a>
+  <a href="#"><img src="https://img.shields.io/badge/Docker-alternative-blue.svg" alt="Docker Alternative"></a>
+  <a href="#"><img src="https://img.shields.io/badge/OCI-compliant-green.svg" alt="OCI Compliant"></a>
+</p>
 
-**Production by PaongLabs**
+<p align="center">
+  Qcker is a lightweight, high-performance alternative to Docker.
+  <br>
+  No daemon. No bloat. Just containers.
+</p>
+
+<p align="center">
+  <strong>Production by PaongLabs</strong>
+</p>
 
 ---
 
