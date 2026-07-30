@@ -1,4 +1,5 @@
 mod commands;
+mod error_display;
 mod output;
 mod tui;
 

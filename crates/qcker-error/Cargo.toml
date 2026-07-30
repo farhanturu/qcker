@@ -1,0 +1,12 @@
+[package]
+name = "qcker-error"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Qcker error library with error codes, source location, and suggestions"
+
+[dependencies]
+thiserror = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+chrono = "0.4"

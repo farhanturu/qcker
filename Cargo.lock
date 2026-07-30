@@ -1387,6 +1387,7 @@ dependencies = [
  "nix 0.27.1",
  "qcker-common",
  "qcker-engine",
+ "qcker-error",
  "qcker-runtime",
  "ratatui",
  "serde",
@@ -1423,6 +1424,7 @@ dependencies = [
  "hex",
  "libc",
  "nix 0.27.1",
+ "qcker-error",
  "serde",
  "serde_json",
  "sha2",
@@ -1456,6 +1458,16 @@ dependencies = [
  "thiserror 1.0.69",
  "tokio",
  "tracing",
+]
+
+[[package]]
+name = "qcker-error"
+version = "0.1.0"
+dependencies = [
+ "chrono",
+ "serde",
+ "serde_json",
+ "thiserror 1.0.69",
 ]
 
 [[package]]

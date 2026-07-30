@@ -6,6 +6,7 @@ license.workspace = true
 description = "Common utilities for Qcker container engine"
 
 [dependencies]
+qcker-error = { path = "../qcker-error" }
 thiserror = { workspace = true }
 sha2 = { workspace = true }
 hex = { workspace = true }

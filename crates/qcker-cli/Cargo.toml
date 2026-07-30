@@ -13,6 +13,7 @@ path = "src/main.rs"
 qcker-common = { path = "../qcker-common" }
 qcker-runtime = { path = "../qcker-runtime" }
 qcker-engine = { path = "../qcker-engine" }
+qcker-error = { path = "../qcker-error" }
 clap = { workspace = true }
 anyhow = { workspace = true }
 tracing = { workspace = true }

@@ -2,3 +2,4 @@ pub mod app;
 pub mod ui;
 pub mod event;
 pub mod handler;
+pub mod theme;

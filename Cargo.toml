@@ -6,6 +6,7 @@ members = [
     "crates/qcker-engine",
     "crates/qcker-ext-api",
     "crates/qcker-backend",
+    "crates/qcker-error",
 ]
 resolver = "2"
 
