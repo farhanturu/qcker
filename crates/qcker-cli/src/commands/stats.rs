@@ -99,7 +99,7 @@ pub fn execute(args: StatsArgs, data_dir: &Path, format: &str) -> anyhow::Result
 fn get_process_stats(pid: i32) -> (u64, u64) {
     let status_path = format!("/proc/{}/status", pid);
 
-    let mut cpu_usage = 0u64;
+    let cpu_usage = 0u64;
     let mut mem_usage = 0u64;
 
     if let Ok(content) = std::fs::read_to_string(&status_path) {

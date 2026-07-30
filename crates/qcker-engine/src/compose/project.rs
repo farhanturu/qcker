@@ -46,9 +46,6 @@ impl ComposeProject {
 
         tracing::info!("Starting project {}", self.name);
 
-        let network_name = self.network_name();
-        tracing::info!("Creating network {}", network_name);
-
         for service_name in &services_to_start {
             if let Some(service_config) = self.file.services.get(service_name) {
                 self.start_service(service_name, service_config)?;
@@ -56,35 +53,23 @@ impl ComposeProject {
         }
 
         tracing::info!("Project {} started", self.name);
-
         Ok(())
     }
 
     fn start_service(&self, name: &str, config: &ServiceConfig) -> Result<()> {
         let container_name = self.container_name(name);
+        let image = config.image.clone().unwrap_or_else(|| format!("{}:latest", name));
 
         tracing::info!("Starting service {} ({})", name, container_name);
-
-        let image = config.image.clone().unwrap_or_else(|| {
-            format!("{}:{}", name, "latest")
-        });
-
-        let _command = ComposeFile::get_command(&config.command);
-
-        let _env = ComposeFile::get_env(&config.environment);
-
-        let ports = config.ports.clone().unwrap_or_default();
-
-        let volumes = config.volumes.clone().unwrap_or_default();
-
         tracing::info!("  Image: {}", image);
-        if !ports.is_empty() {
+
+        if let Some(ref ports) = config.ports {
             tracing::info!("  Ports: {:?}", ports);
         }
-        if !volumes.is_empty() {
+
+        if let Some(ref volumes) = config.volumes {
             tracing::info!("  Volumes: {:?}", volumes);
         }
-
 
         Ok(())
     }
@@ -96,12 +81,9 @@ impl ComposeProject {
         for service_name in service_order.iter().rev() {
             let container_name = self.container_name(service_name);
             tracing::info!("Stopping service {} ({})", service_name, container_name);
-
         }
 
-        let network_name = self.network_name();
-        tracing::info!("Removing network {}", network_name);
-
+        tracing::info!("Removing network {}", self.network_name());
         tracing::info!("Project {} stopped", self.name);
 
         Ok(())
@@ -113,7 +95,7 @@ impl ComposeProject {
         for (name, _) in &self.file.services {
             statuses.push(ServiceStatus {
                 name: name.clone(),
-                state: "stopped".to_string(), // TODO: Check actual state
+                state: "stopped".to_string(),
                 container_id: None,
             });
         }
