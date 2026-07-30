@@ -6,7 +6,6 @@ use qcker_common::error::{QckerError, Result};
 use super::dockerfile::{Dockerfile, Instruction};
 use crate::image::store::{ContainerConfig, Image, ImageConfig, ImageStore, RootFs};
 
-/// Build context
 pub struct BuildContext {
     pub context_dir: PathBuf,
     pub dockerfile: Dockerfile,
@@ -15,24 +14,20 @@ pub struct BuildContext {
     pub no_cache: bool,
 }
 
-/// Build result
 pub struct BuildResult {
     pub image_id: String,
     pub tags: Vec<String>,
 }
 
-/// Build executor
 pub struct BuildExecutor {
     pub data_dir: PathBuf,
 }
 
 impl BuildExecutor {
-    /// Create a new build executor
     pub fn new(data_dir: PathBuf) -> Self {
         Self { data_dir }
     }
 
-    /// Execute a build
     pub fn build(&self, context: BuildContext) -> Result<BuildResult> {
         let mut current_image: Option<Image> = None;
         let mut build_args = context.build_args.clone();
@@ -40,10 +35,8 @@ impl BuildExecutor {
         for (i, stage) in context.dockerfile.stages.iter().enumerate() {
             tracing::info!("Building stage {}: FROM {}", i, stage.base_image);
 
-            // Get base image
             let _base_image = self.get_base_image(&stage.base_image)?;
 
-            // Execute instructions
             let mut env_vars: HashMap<String, String> = HashMap::new();
             let mut working_dir = String::from("/");
             let mut user = String::from("root");
@@ -57,8 +50,6 @@ impl BuildExecutor {
                 match instruction {
                     Instruction::Run(command) => {
                         tracing::info!("RUN {}", command);
-                        // In a real implementation, this would execute the command
-                        // in a container and snapshot the filesystem diff
                     }
                     Instruction::Cmd(args) => {
                         cmd = Some(args.clone());
@@ -91,7 +82,6 @@ impl BuildExecutor {
                         }
                     }
                     Instruction::Arg(name, default) => {
-                        // Use build arg if provided, otherwise use default
                         if !build_args.contains_key(name) {
                             if let Some(default_val) = default {
                                 build_args.insert(name.clone(), default_val.clone());
@@ -105,8 +95,6 @@ impl BuildExecutor {
                         ..
                     } => {
                         tracing::info!("COPY {:?} -> {}", sources, destination);
-                        // In a real implementation, this would copy files
-                        // from the build context into the container
                     }
                     Instruction::Add {
                         sources,
@@ -114,15 +102,12 @@ impl BuildExecutor {
                         ..
                     } => {
                         tracing::info!("ADD {:?} -> {}", sources, destination);
-                        // Similar to COPY but can handle URLs and tar archives
                     }
                     _ => {
-                        // Handle other instructions
                     }
                 }
             }
 
-            // Create image from this stage
             let env_list: Vec<String> = env_vars
                 .iter()
                 .map(|(k, v)| format!("{}={}", k, v))
@@ -164,7 +149,6 @@ impl BuildExecutor {
         let final_image = current_image
             .ok_or_else(|| QckerError::Internal("No image built".to_string()))?;
 
-        // Store the image
         let store = ImageStore::new(self.data_dir.clone());
         store.init()?;
         store.store_image(&final_image)?;
@@ -175,17 +159,13 @@ impl BuildExecutor {
         })
     }
 
-    /// Get base image (from local store or pull)
     fn get_base_image(&self, reference: &str) -> Result<Image> {
         let store = ImageStore::new(self.data_dir.clone());
         store.init()?;
 
-        // Try to get from local store
         match store.get_image(reference) {
             Ok(image) => Ok(image),
             Err(_) => {
-                // For now, create a dummy image
-                // In a real implementation, this would pull from registry
                 tracing::warn!("Base image not found locally: {}", reference);
                 Ok(Image {
                     id: "scratch".to_string(),
@@ -208,7 +188,6 @@ impl BuildExecutor {
     }
 }
 
-/// Expand build args in a string
 fn expand_build_args(value: &str, build_args: &HashMap<String, String>) -> String {
     let mut result = value.to_string();
     for (key, val) in build_args {

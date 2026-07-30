@@ -4,7 +4,6 @@ use std::process::Command;
 use crate::spec::Container;
 use qcker_common::error::{QckerError, Result};
 
-/// OCI lifecycle hook
 #[derive(Debug, Clone)]
 pub struct Hook {
     pub path: PathBuf,
@@ -13,7 +12,6 @@ pub struct Hook {
     pub timeout: Option<u32>,
 }
 
-/// Hook type
 #[derive(Debug, Clone)]
 pub enum HookType {
     Prestart,
@@ -24,14 +22,11 @@ pub enum HookType {
     Poststop,
 }
 
-/// Execute a hook
 pub fn execute_hook(hook: &Hook, container: &Container) -> Result<()> {
     let mut cmd = Command::new(&hook.path);
 
-    // Set arguments
     cmd.args(&hook.args);
 
-    // Set environment variables
     for env in &hook.env {
         let parts: Vec<&str> = env.splitn(2, '=').collect();
         if parts.len() == 2 {
@@ -39,11 +34,9 @@ pub fn execute_hook(hook: &Hook, container: &Container) -> Result<()> {
         }
     }
 
-    // Set container state as environment variable
     cmd.env("container_id", &container.id);
     cmd.env("container_pid", container.pid.unwrap_or(0).to_string());
 
-    // Execute hook
     let output = cmd
         .output()
         .map_err(|e| QckerError::Process(format!("Failed to execute hook: {}", e)))?;
@@ -58,7 +51,6 @@ pub fn execute_hook(hook: &Hook, container: &Container) -> Result<()> {
     Ok(())
 }
 
-/// Execute prestart hooks
 pub fn execute_prestart_hooks(container: &Container, hooks: &[Hook]) -> Result<()> {
     for hook in hooks {
         execute_hook(hook, container)?;
@@ -66,7 +58,6 @@ pub fn execute_prestart_hooks(container: &Container, hooks: &[Hook]) -> Result<(
     Ok(())
 }
 
-/// Execute poststart hooks
 pub fn execute_poststart_hooks(container: &Container, hooks: &[Hook]) -> Result<()> {
     for hook in hooks {
         execute_hook(hook, container)?;
@@ -74,7 +65,6 @@ pub fn execute_poststart_hooks(container: &Container, hooks: &[Hook]) -> Result<
     Ok(())
 }
 
-/// Execute poststop hooks
 pub fn execute_poststop_hooks(container: &Container, hooks: &[Hook]) -> Result<()> {
     for hook in hooks {
         execute_hook(hook, container)?;

@@ -88,7 +88,6 @@ pub fn drop_all_capabilities() -> Result<()> {
     state.set_current()
         .map_err(|e| QckerError::Capability(format!("Failed to drop caps: {}", e)))?;
 
-    // Verify
     let verify = capctl::caps::CapState::get_current()
         .map_err(|e| QckerError::Capability(format!("Failed to verify caps: {}", e)))?;
 

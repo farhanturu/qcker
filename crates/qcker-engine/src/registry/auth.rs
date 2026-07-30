@@ -4,7 +4,6 @@ use std::path::PathBuf;
 
 use qcker_common::error::{QckerError, Result};
 
-/// Registry authentication
 #[derive(Debug, Clone)]
 pub struct RegistryAuth {
     pub username: Option<String>,
@@ -13,7 +12,6 @@ pub struct RegistryAuth {
 }
 
 impl RegistryAuth {
-    /// Create basic auth
     pub fn basic(username: &str, password: &str) -> Self {
         Self {
             username: Some(username.to_string()),
@@ -22,7 +20,6 @@ impl RegistryAuth {
         }
     }
 
-    /// Create token auth
     pub fn token(token: &str) -> Self {
         Self {
             username: None,
@@ -31,7 +28,6 @@ impl RegistryAuth {
         }
     }
 
-    /// Apply auth to request
     pub fn apply(&self, request: reqwest::RequestBuilder) -> reqwest::RequestBuilder {
         if let Some(ref token) = self.token {
             request.header("Authorization", format!("Bearer {}", token))
@@ -43,20 +39,17 @@ impl RegistryAuth {
     }
 }
 
-/// Docker config file format
 #[derive(Debug, Serialize, Deserialize)]
 struct DockerConfig {
     auths: std::collections::HashMap<String, AuthEntry>,
 }
 
-/// Auth entry in docker config
 #[derive(Debug, Serialize, Deserialize)]
 struct AuthEntry {
     auth: Option<String>,
     identitytoken: Option<String>,
 }
 
-/// Load auth from docker config
 pub fn load_docker_auth(registry: &str) -> Result<Option<RegistryAuth>> {
     let config_path = get_docker_config_path()?;
 
@@ -70,7 +63,6 @@ pub fn load_docker_auth(registry: &str) -> Result<Option<RegistryAuth>> {
     let config: DockerConfig = serde_json::from_str(&config_json)
         .map_err(|e| QckerError::Internal(format!("Failed to parse docker config: {}", e)))?;
 
-    // Try to find auth for registry
     let registry_url = format!("https://{}", registry);
     if let Some(entry) = config.auths.get(&registry_url).or_else(|| config.auths.get(registry)) {
         if let Some(ref token) = entry.identitytoken {
@@ -89,12 +81,10 @@ pub fn load_docker_auth(registry: &str) -> Result<Option<RegistryAuth>> {
     Ok(None)
 }
 
-/// Get docker config path
 fn get_docker_config_path() -> Result<PathBuf> {
     let home_dir = dirs::home_dir()
         .ok_or_else(|| QckerError::Internal("Failed to get home directory".to_string()))?;
 
-    // Check for DOCKER_CONFIG env var
     if let Ok(docker_config) = std::env::var("DOCKER_CONFIG") {
         return Ok(PathBuf::from(docker_config).join("config.json"));
     }
@@ -102,7 +92,6 @@ fn get_docker_config_path() -> Result<PathBuf> {
     Ok(home_dir.join(".docker").join("config.json"))
 }
 
-/// Simple base64 decode
 fn base64_decode(input: &str) -> Result<String> {
     use base64::Engine;
     let decoded = base64::engine::general_purpose::STANDARD.decode(input)
@@ -111,7 +100,6 @@ fn base64_decode(input: &str) -> Result<String> {
         .map_err(|e| QckerError::Internal(format!("Failed to decode utf8: {}", e)))
 }
 
-/// Save auth to qcker config
 pub fn save_qcker_auth(registry: &str, auth: &RegistryAuth) -> Result<()> {
     let config_dir = dirs::config_dir()
         .ok_or_else(|| QckerError::Internal("Failed to get config directory".to_string()))?
@@ -122,7 +110,6 @@ pub fn save_qcker_auth(registry: &str, auth: &RegistryAuth) -> Result<()> {
 
     let config_path = config_dir.join("auth.json");
 
-    // Load existing config
     let mut config: serde_json::Value = if config_path.exists() {
         let content = fs::read_to_string(&config_path)
             .map_err(|e| QckerError::Internal(format!("Failed to read config: {}", e)))?;
@@ -132,7 +119,6 @@ pub fn save_qcker_auth(registry: &str, auth: &RegistryAuth) -> Result<()> {
         serde_json::json!({ "auths": {} })
     };
 
-    // Update auth
     let auths = config["auths"].as_object_mut()
         .ok_or_else(|| QckerError::Internal("Invalid config format".to_string()))?;
 
@@ -147,7 +133,6 @@ pub fn save_qcker_auth(registry: &str, auth: &RegistryAuth) -> Result<()> {
 
     auths.insert(registry.to_string(), entry);
 
-    // Save config
     let config_json = serde_json::to_string_pretty(&config)
         .map_err(|e| QckerError::Internal(format!("Failed to serialize config: {}", e)))?;
     fs::write(&config_path, config_json)
@@ -156,7 +141,6 @@ pub fn save_qcker_auth(registry: &str, auth: &RegistryAuth) -> Result<()> {
     Ok(())
 }
 
-/// Simple base64 encode
 fn base64_encode(input: &str) -> String {
     use base64::Engine;
     base64::engine::general_purpose::STANDARD.encode(input)

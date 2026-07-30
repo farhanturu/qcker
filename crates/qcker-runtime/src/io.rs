@@ -3,14 +3,12 @@ use std::os::fd::{AsRawFd, RawFd};
 
 use qcker_common::error::{QckerError, Result};
 
-/// Container I/O configuration
 pub struct ContainerIo {
     pub stdin_fd: Option<RawFd>,
     pub stdout_fd: Option<RawFd>,
     pub stderr_fd: Option<RawFd>,
 }
 
-/// Create pipes for container I/O
 pub fn create_pipes() -> Result<(ContainerIo, ContainerIo)> {
     let (stdin_read, stdin_write) = pipe()
         .map_err(|e| QckerError::Process(format!("Failed to create stdin pipe: {}", e)))?;
@@ -36,7 +34,6 @@ pub fn create_pipes() -> Result<(ContainerIo, ContainerIo)> {
     Ok((parent_io, child_io))
 }
 
-/// Redirect container I/O to /dev/null
 pub fn redirect_to_null() -> Result<()> {
     let dev_null = nix::fcntl::open(
         "/dev/null",
@@ -54,7 +51,6 @@ pub fn redirect_to_null() -> Result<()> {
     Ok(())
 }
 
-/// Close pipe file descriptors
 pub fn close_pipes(io: &ContainerIo) -> Result<()> {
     if let Some(fd) = io.stdin_fd {
         unsafe { libc::close(fd); }
@@ -82,7 +78,6 @@ mod tests {
         assert!(child_io.stdout_fd.is_some());
         assert!(child_io.stderr_fd.is_some());
 
-        // Clean up
         close_pipes(&parent_io).unwrap();
         close_pipes(&child_io).unwrap();
     }

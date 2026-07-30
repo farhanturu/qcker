@@ -4,7 +4,6 @@ use std::path::Path;
 use qcker_engine::network::manager::NetworkManager;
 use qcker_engine::network::types::NetworkConfig;
 
-/// Manage networks
 #[derive(Args)]
 pub struct NetworkArgs {
     #[command(subcommand)]
@@ -13,42 +12,30 @@ pub struct NetworkArgs {
 
 #[derive(Subcommand)]
 pub enum NetworkCommand {
-    /// Create a network
     Create(CreateNetworkArgs),
-    /// Remove a network
     Rm(RmNetworkArgs),
-    /// List networks
     Ls,
-    /// Inspect a network
     Inspect(InspectNetworkArgs),
 }
 
-/// Create a network
 #[derive(Args)]
 pub struct CreateNetworkArgs {
-    /// Network name
     name: String,
 
-    /// Network driver
     #[arg(short, long, default_value = "bridge")]
     driver: String,
 
-    /// Subnet (e.g., 172.20.0.0/16)
     #[arg(long)]
     subnet: Option<String>,
 }
 
-/// Remove a network
 #[derive(Args)]
 pub struct RmNetworkArgs {
-    /// Network name or ID
     name: String,
 }
 
-/// Inspect a network
 #[derive(Args)]
 pub struct InspectNetworkArgs {
-    /// Network name or ID
     name: String,
 }
 

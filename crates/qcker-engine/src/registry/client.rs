@@ -6,7 +6,6 @@ use qcker_common::error::{QckerError, Result};
 use super::auth::RegistryAuth;
 use crate::image::store::{Image, ImageConfig};
 
-/// OCI Distribution manifest
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct OciManifest {
     pub schema_version: u32,
@@ -15,7 +14,6 @@ pub struct OciManifest {
     pub layers: Vec<Descriptor>,
 }
 
-/// OCI Descriptor
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Descriptor {
     pub media_type: String,
@@ -24,7 +22,6 @@ pub struct Descriptor {
     pub urls: Option<Vec<String>>,
 }
 
-/// Registry client for OCI Distribution Spec
 pub struct RegistryClient {
     pub registry: String,
     pub auth: Option<RegistryAuth>,
@@ -32,7 +29,6 @@ pub struct RegistryClient {
 }
 
 impl RegistryClient {
-    /// Create a new registry client
     pub fn new(registry: &str) -> Self {
         Self {
             registry: registry.to_string(),
@@ -41,19 +37,16 @@ impl RegistryClient {
         }
     }
 
-    /// Set authentication
     pub fn with_auth(mut self, auth: RegistryAuth) -> Self {
         self.auth = Some(auth);
         self
     }
 
-    /// Parse image reference (e.g., "alpine:latest" -> ("library/alpine", "latest"))
     pub fn parse_reference(image: &str) -> (String, String) {
         let parts: Vec<&str> = image.splitn(2, ':').collect();
         let name = parts[0];
         let tag = if parts.len() > 1 { parts[1] } else { "latest" };
 
-        // Add library/ prefix if no namespace
         let full_name = if !name.contains('/') {
             format!("library/{}", name)
         } else {
@@ -63,7 +56,6 @@ impl RegistryClient {
         (full_name, tag.to_string())
     }
 
-    /// Pull an image manifest
     pub async fn pull_manifest(&self, name: &str, tag: &str) -> Result<OciManifest> {
         let url = format!(
             "https://{}/v2/{}/manifests/{}",
@@ -93,7 +85,6 @@ impl RegistryClient {
         Ok(manifest)
     }
 
-    /// Pull a blob (layer or config)
     pub async fn pull_blob(&self, name: &str, digest: &str) -> Result<Vec<u8>> {
         let url = format!(
             "https://{}/v2/{}/blobs/{}",
@@ -122,21 +113,17 @@ impl RegistryClient {
         Ok(bytes.to_vec())
     }
 
-    /// Pull a complete image
     pub async fn pull_image(&self, image: &str, data_dir: PathBuf) -> Result<Image> {
         let (name, tag) = Self::parse_reference(image);
 
         tracing::info!("Pulling {}:{} from {}", name, tag, self.registry);
 
-        // Pull manifest
         let manifest = self.pull_manifest(&name, &tag).await?;
 
-        // Pull config
         let config_bytes = self.pull_blob(&name, &manifest.config.digest).await?;
         let config: ImageConfig = serde_json::from_slice(&config_bytes)
             .map_err(|e| QckerError::Internal(format!("Failed to parse config: {}", e)))?;
 
-        // Pull layers
         let mut layer_digests = Vec::new();
         let layers_dir = data_dir.join("layers");
         std::fs::create_dir_all(&layers_dir)
@@ -147,7 +134,6 @@ impl RegistryClient {
 
             let layer_bytes = self.pull_blob(&name, &layer_desc.digest).await?;
 
-            // Save layer
             let hash = layer_desc.digest.strip_prefix("sha256:").unwrap_or(&layer_desc.digest);
             let layer_dir = layers_dir.join(hash);
             std::fs::create_dir_all(&layer_dir)
@@ -157,7 +143,6 @@ impl RegistryClient {
             std::fs::write(&layer_file, &layer_bytes)
                 .map_err(|e| QckerError::Internal(format!("Failed to write layer: {}", e)))?;
 
-            // Extract layer
             let extract_dir = layer_dir.join("layer");
             std::fs::create_dir_all(&extract_dir)
                 .map_err(|e| QckerError::Internal(format!("Failed to create extract dir: {}", e)))?;
@@ -166,7 +151,6 @@ impl RegistryClient {
             layer_digests.push(layer_desc.digest.clone());
         }
 
-        // Create image
         let image_id = manifest.config.digest.strip_prefix("sha256:").unwrap_or(&manifest.config.digest);
         let image = Image {
             id: image_id[..12].to_string(),
@@ -177,7 +161,6 @@ impl RegistryClient {
             config: config,
         };
 
-        // Store image
         let store = crate::image::store::ImageStore::new(data_dir);
         store.init()?;
         store.store_image(&image)?;

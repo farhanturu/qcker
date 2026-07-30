@@ -3,63 +3,44 @@ use std::path::Path;
 
 use qcker_common::error::{QckerError, Result};
 
-/// Dockerfile instruction
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum Instruction {
-    /// FROM <image> [AS <name>]
     From {
         image: String,
         alias: Option<String>,
     },
-    /// RUN <command>
     Run(String),
-    /// CMD ["executable","param1","param2"]
     Cmd(Vec<String>),
-    /// LABEL <key>=<value> ...
     Label(Vec<(String, String)>),
-    /// EXPOSE <port> [<port>/<protocol>...]
     Expose(Vec<String>),
-    /// ENV <key>=<value> ...
     Env(Vec<(String, String)>),
-    /// ADD [--chown=<user>:<group>] <src>... <dest>
     Add {
         sources: Vec<String>,
         destination: String,
         chown: Option<String>,
     },
-    /// COPY [--chown=<user>:<group>] <src>... <dest>
     Copy {
         sources: Vec<String>,
         destination: String,
         chown: Option<String>,
         from: Option<String>,
     },
-    /// ENTRYPOINT ["executable", "param1"]
     Entrypoint(Vec<String>),
-    /// VOLUME ["/data"]
     Volume(Vec<String>),
-    /// USER <user>[:<group>]
     User(String),
-    /// WORKDIR /path/to/workdir
     Workdir(String),
-    /// ARG <name>[=<default>]
     Arg(String, Option<String>),
-    /// ONBUILD <INSTRUCTION>
     Onbuild(Box<Instruction>),
-    /// STOPSIGNAL <signal>
     Stopsignal(String),
-    /// HEALTHCHECK [OPTIONS] CMD command
     Healthcheck {
         interval: Option<String>,
         timeout: Option<String>,
         retries: Option<u32>,
         command: String,
     },
-    /// SHELL ["executable", "parameters"]
     Shell(Vec<String>),
 }
 
-/// Build stage
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Stage {
     pub name: Option<String>,
@@ -67,13 +48,11 @@ pub struct Stage {
     pub instructions: Vec<Instruction>,
 }
 
-/// Parsed Dockerfile
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Dockerfile {
     pub stages: Vec<Stage>,
 }
 
-/// Parse a Dockerfile
 pub fn parse(content: &str) -> Result<Dockerfile> {
     let mut stages = Vec::new();
     let mut current_stage: Option<Stage> = None;
@@ -83,12 +62,10 @@ pub fn parse(content: &str) -> Result<Dockerfile> {
     for line in content.lines() {
         let trimmed = line.trim();
 
-        // Skip empty lines and comments
         if trimmed.is_empty() || trimmed.starts_with('#') {
             continue;
         }
 
-        // Handle line continuation
         if in_continuation {
             current_instruction.push(' ');
             current_instruction.push_str(trimmed.trim_end_matches('\\').trim());
@@ -100,23 +77,19 @@ pub fn parse(content: &str) -> Result<Dockerfile> {
             continue;
         }
 
-        // Check for line continuation
         if trimmed.ends_with('\\') {
             in_continuation = true;
             current_instruction = trimmed.trim_end_matches('\\').trim().to_string();
             continue;
         }
 
-        // Process single line instruction
         process_instruction(&mut current_stage, &mut stages, trimmed)?;
     }
 
-    // Process any remaining instruction
     if !current_instruction.is_empty() {
         process_instruction(&mut current_stage, &mut stages, &current_instruction)?;
     }
 
-    // Add the last stage
     if let Some(stage) = current_stage {
         stages.push(stage);
     }
@@ -128,7 +101,6 @@ pub fn parse(content: &str) -> Result<Dockerfile> {
     Ok(Dockerfile { stages })
 }
 
-/// Process a single instruction
 fn process_instruction(
     current_stage: &mut Option<Stage>,
     stages: &mut Vec<Stage>,
@@ -138,12 +110,10 @@ fn process_instruction(
 
     match keyword.as_str() {
         "FROM" => {
-            // Save previous stage
             if let Some(stage) = current_stage.take() {
                 stages.push(stage);
             }
 
-            // Parse FROM instruction
             let parts: Vec<&str> = args.split_whitespace().collect();
             let image = parts[0].to_string();
             let alias = if parts.len() > 2 && parts[1].eq_ignore_ascii_case("AS") {
@@ -255,7 +225,6 @@ fn process_instruction(
     Ok(())
 }
 
-/// Parse instruction keyword and args
 fn parse_instruction(line: &str) -> Result<(String, String)> {
     let line = line.trim();
     let space_pos = line.find(char::is_whitespace).unwrap_or(line.len());
@@ -264,13 +233,11 @@ fn parse_instruction(line: &str) -> Result<(String, String)> {
     Ok((keyword, args))
 }
 
-/// Parse JSON array or shell command
 fn parse_json_or_shell(args: &str) -> Result<Vec<String>> {
     let trimmed = args.trim();
     if trimmed.starts_with('[') {
         parse_json_array_inner(trimmed)
     } else {
-        // Shell form - use /bin/sh -c
         Ok(vec![
             "/bin/sh".to_string(),
             "-c".to_string(),
@@ -279,14 +246,12 @@ fn parse_json_or_shell(args: &str) -> Result<Vec<String>> {
     }
 }
 
-/// Parse JSON array
 fn parse_json_array(args: &str) -> Vec<String> {
     parse_json_array_inner(args).unwrap_or_else(|_| {
         args.split_whitespace().map(String::from).collect()
     })
 }
 
-/// Parse JSON array inner
 fn parse_json_array_inner(args: &str) -> Result<Vec<String>> {
     let trimmed = args.trim();
     if !trimmed.starts_with('[') || !trimmed.ends_with(']') {
@@ -335,7 +300,6 @@ fn parse_json_array_inner(args: &str) -> Result<Vec<String>> {
     Ok(result)
 }
 
-/// Parse key=value pairs
 fn parse_key_value_pairs(args: &str) -> Vec<(String, String)> {
     let mut pairs = Vec::new();
     let mut parts = args.split_whitespace();
@@ -353,7 +317,6 @@ fn parse_key_value_pairs(args: &str) -> Vec<(String, String)> {
     pairs
 }
 
-/// Parse COPY/ADD arguments
 fn parse_copy_add_args(args: &str) -> Result<(Vec<String>, String, Option<String>)> {
     let parts: Vec<&str> = args.split_whitespace().collect();
     if parts.len() < 2 {
@@ -369,7 +332,6 @@ fn parse_copy_add_args(args: &str) -> Result<(Vec<String>, String, Option<String
         .map(|s| s.to_string())
         .collect();
 
-    // Parse --chown flag
     let chown = parts
         .iter()
         .find(|s| s.starts_with("--chown="))
@@ -378,7 +340,6 @@ fn parse_copy_add_args(args: &str) -> Result<(Vec<String>, String, Option<String
     Ok((sources, destination, chown))
 }
 
-/// Parse ARG instruction
 fn parse_arg(args: &str) -> (String, Option<String>) {
     if let Some(eq_pos) = args.find('=') {
         let name = args[..eq_pos].trim().to_string();
@@ -389,7 +350,6 @@ fn parse_arg(args: &str) -> (String, Option<String>) {
     }
 }
 
-/// Parse Dockerfile from file
 pub fn parse_file(path: &Path) -> Result<Dockerfile> {
     let content = std::fs::read_to_string(path)
         .map_err(|e| QckerError::Internal(format!("Failed to read Dockerfile: {}", e)))?;

@@ -4,16 +4,12 @@ use std::os::fd::{AsRawFd, BorrowedFd, RawFd};
 
 use qcker_common::error::{QckerError, Result};
 
-/// Terminal mode
 #[derive(Debug, Clone, Copy)]
 pub enum TerminalMode {
-    /// Interactive terminal (PTY)
     Interactive,
-    /// Non-interactive (pipes)
     NonInteractive,
 }
 
-/// Terminal handle
 pub struct Terminal {
     pub master_fd: RawFd,
     pub slave_fd: RawFd,
@@ -21,7 +17,6 @@ pub struct Terminal {
 }
 
 impl Terminal {
-    /// Create a new PTY terminal
     pub fn new() -> Result<Self> {
         let OpenptyResult { master, slave } =
             openpty(None, None).map_err(|e| QckerError::Process(format!("Failed to open PTY: {}", e)))?;
@@ -33,7 +28,6 @@ impl Terminal {
         })
     }
 
-    /// Set terminal to raw mode
     pub fn set_raw_mode(&self) -> Result<()> {
         let master_fd = unsafe { BorrowedFd::borrow_raw(self.master_fd) };
         let mut termios = termios::tcgetattr(master_fd)
@@ -47,7 +41,6 @@ impl Terminal {
         Ok(())
     }
 
-    /// Resize terminal
     pub fn resize(&self, rows: u16, cols: u16) -> Result<()> {
         let winsize = libc::winsize {
             ws_row: rows,
@@ -69,7 +62,6 @@ impl Terminal {
         Ok(())
     }
 
-    /// Get slave fd for container process
     pub fn slave_fd(&self) -> RawFd {
         self.slave_fd
     }
@@ -84,7 +76,6 @@ impl Drop for Terminal {
     }
 }
 
-/// Proxy terminal I/O between parent and container
 pub fn proxy_terminal(master_fd: RawFd) -> Result<()> {
     use std::io::{self, Read, Write};
 
@@ -92,7 +83,6 @@ pub fn proxy_terminal(master_fd: RawFd) -> Result<()> {
     let mut stdout = io::stdout();
     let mut buf = [0u8; 1024];
 
-    // Set stdin to raw mode
     let stdin_fd = unsafe { BorrowedFd::borrow_raw(0) };
     let orig_termios = termios::tcgetattr(stdin_fd)
         .map_err(|e| QckerError::Process(format!("Failed to get stdin attrs: {}", e)))?;
@@ -102,9 +92,7 @@ pub fn proxy_terminal(master_fd: RawFd) -> Result<()> {
     termios::tcsetattr(stdin_fd, SetArg::TCSANOW, &raw_termios)
         .map_err(|e| QckerError::Process(format!("Failed to set stdin raw mode: {}", e)))?;
 
-    // Proxy I/O
     loop {
-        // Check for input from stdin
         let mut poll_fds = [
             libc::pollfd {
                 fd: 0, // stdin
@@ -123,7 +111,6 @@ pub fn proxy_terminal(master_fd: RawFd) -> Result<()> {
             break;
         }
 
-        // stdin -> master
         if poll_fds[0].revents & libc::POLLIN != 0 {
             match stdin.read(&mut buf) {
                 Ok(0) => break,
@@ -136,7 +123,6 @@ pub fn proxy_terminal(master_fd: RawFd) -> Result<()> {
             }
         }
 
-        // master -> stdout
         if poll_fds[1].revents & libc::POLLIN != 0 {
             unsafe {
                 let n = libc::read(master_fd, buf.as_mut_ptr() as *mut _, buf.len());
@@ -151,7 +137,6 @@ pub fn proxy_terminal(master_fd: RawFd) -> Result<()> {
         }
     }
 
-    // Restore terminal
     termios::tcsetattr(stdin_fd, SetArg::TCSANOW, &orig_termios)
         .map_err(|e| QckerError::Process(format!("Failed to restore terminal: {}", e)))?;
 

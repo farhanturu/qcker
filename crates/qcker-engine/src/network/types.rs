@@ -1,6 +1,5 @@
 use serde::{Deserialize, Serialize};
 
-/// Network driver type
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub enum NetworkDriver {
     Bridge,
@@ -8,7 +7,6 @@ pub enum NetworkDriver {
     None,
 }
 
-/// Network configuration
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct NetworkConfig {
     pub id: String,
@@ -21,7 +19,6 @@ pub struct NetworkConfig {
     pub labels: std::collections::HashMap<String, String>,
 }
 
-/// Container network configuration
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ContainerNetworkConfig {
     pub container_id: String,
@@ -34,7 +31,6 @@ pub struct ContainerNetworkConfig {
     pub extra_hosts: Vec<(String, String)>,
 }
 
-/// Port mapping
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PortMapping {
     pub host_ip: Option<String>,
@@ -43,7 +39,6 @@ pub struct PortMapping {
     pub protocol: String,
 }
 
-/// Network info for listing
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct NetworkInfo {
     pub id: String,
@@ -54,7 +49,6 @@ pub struct NetworkInfo {
     pub container_count: usize,
 }
 
-/// Network inspect details
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct NetworkDetail {
     pub config: NetworkConfig,
@@ -63,7 +57,6 @@ pub struct NetworkDetail {
 }
 
 impl NetworkConfig {
-    /// Create a new bridge network
     pub fn new_bridge(name: &str, subnet: &str) -> Self {
         let gateway = compute_gateway(subnet);
         Self {
@@ -78,7 +71,6 @@ impl NetworkConfig {
         }
     }
 
-    /// Create a host network
     pub fn new_host() -> Self {
         Self {
             id: "host".to_string(),
@@ -92,7 +84,6 @@ impl NetworkConfig {
         }
     }
 
-    /// Create a none network
     pub fn new_none() -> Self {
         Self {
             id: "none".to_string(),
@@ -107,7 +98,6 @@ impl NetworkConfig {
     }
 }
 
-/// Compute gateway from subnet (first usable IP)
 fn compute_gateway(subnet: &str) -> String {
     let parts: Vec<&str> = subnet.split('/').collect();
     if parts.is_empty() {
@@ -126,7 +116,6 @@ fn compute_gateway(subnet: &str) -> String {
     }
 }
 
-/// Parse port mapping string (e.g., "8080:80", "127.0.0.1:8080:80", "8080:80/tcp")
 pub fn parse_port_mapping(port_str: &str) -> Result<PortMapping, String> {
     let parts: Vec<&str> = port_str.split('/').collect();
     let protocol = if parts.len() > 1 {
@@ -140,7 +129,6 @@ pub fn parse_port_mapping(port_str: &str) -> Result<PortMapping, String> {
 
     match port_parts.len() {
         2 => {
-            // host_port:container_port
             let host_port: u16 = port_parts[0].parse().map_err(|_| "Invalid host port")?;
             let container_port: u16 = port_parts[1].parse().map_err(|_| "Invalid container port")?;
             Ok(PortMapping {
@@ -151,7 +139,6 @@ pub fn parse_port_mapping(port_str: &str) -> Result<PortMapping, String> {
             })
         }
         3 => {
-            // host_ip:host_port:container_port
             let host_ip = port_parts[0].to_string();
             let host_port: u16 = port_parts[1].parse().map_err(|_| "Invalid host port")?;
             let container_port: u16 = port_parts[2].parse().map_err(|_| "Invalid container port")?;

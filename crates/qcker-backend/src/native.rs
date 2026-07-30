@@ -159,7 +159,6 @@ impl RuntimeBackend for NativeBackend {
             return Err("Container is not running".to_string());
         }
 
-        // Get container rootfs path
         let container_dir = self.containers_dir.join(id);
         let rootfs = container_dir.join("rootfs");
 
@@ -167,7 +166,6 @@ impl RuntimeBackend for NativeBackend {
             return Err(format!("Container rootfs not found: {}", rootfs.display()));
         }
 
-        // Build nsenter command to enter container namespaces
         let mut nsenter_args = vec![
             "--target".to_string(),
             container.pid.unwrap_or(0).to_string(),
@@ -180,7 +178,6 @@ impl RuntimeBackend for NativeBackend {
         ];
         nsenter_args.extend_from_slice(command);
 
-        // Use nsenter to enter namespaces, then chroot
         let output = Command::new("nsenter")
             .args(&nsenter_args)
             .output()

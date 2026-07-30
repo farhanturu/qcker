@@ -120,27 +120,22 @@ impl ContainerProcess {
         use nix::sched::{unshare, CloneFlags};
         use nix::unistd::chroot;
 
-        // Determine if we should use user namespace
         let use_user_ns = if let Some(ref linux) = self.container.config.linux {
             linux.namespaces.iter().any(|ns| ns.r#type == crate::spec::NamespaceType::User)
         } else {
             false
         };
 
-        // User namespace must be unshared first (before other namespaces)
         if use_user_ns {
             unshare(CloneFlags::CLONE_NEWUSER)
                 .map_err(|e| QckerError::Process(format!("Failed to unshare user namespace: {}", e)))?;
 
-            // Write UID/GID mappings
             let host_uid = qcker_common::fs::getuid();
             let host_gid = qcker_common::fs::getgid();
 
-            // Deny setgroups before writing gid_map
             fs::write("/proc/self/setgroups", "deny")
                 .map_err(|e| QckerError::Process(format!("Failed to write setgroups: {}", e)))?;
 
-            // Map container root (0) to host user
             fs::write("/proc/self/uid_map", format!("0 {} 1", host_uid))
                 .map_err(|e| QckerError::Process(format!("Failed to write uid_map: {}", e)))?;
 
@@ -150,7 +145,6 @@ impl ContainerProcess {
             tracing::info!("User namespace created: uid_map=0:{}:1, gid_map=0:{}:1", host_uid, host_gid);
         }
 
-        // Unshare other namespaces
         if let Some(ref linux) = self.container.config.linux {
             let mut flags = CloneFlags::empty();
             for ns in &linux.namespaces {
@@ -483,7 +477,6 @@ impl ContainerProcess {
             ForkResult::Child => {
                 nix::unistd::close(pipe_read).ok();
 
-                // Enter container namespaces if we have a container PID
                 if let Some(pid) = container_pid {
                     let ns_types = vec![
                         ("user", crate::spec::NamespaceType::User),

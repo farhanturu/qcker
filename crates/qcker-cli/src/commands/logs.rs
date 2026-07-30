@@ -66,7 +66,6 @@ pub fn execute(args: LogsArgs, data_dir: &Path, format: &str) -> anyhow::Result<
     } else {
         for line in display_lines {
             if args.timestamps {
-                // Add timestamp prefix
                 println!("[{}] {}", chrono::Local::now().format("%Y-%m-%d %H:%M:%S"), line);
             } else {
                 println!("{}", line);

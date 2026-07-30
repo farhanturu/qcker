@@ -2,18 +2,15 @@ use std::path::PathBuf;
 
 use qcker_common::error::{QckerError, Result};
 
-/// Extension loader for dynamic libraries
 pub struct ExtensionLoader {
     pub extensions_dir: PathBuf,
 }
 
 impl ExtensionLoader {
-    /// Create a new extension loader
     pub fn new(extensions_dir: PathBuf) -> Self {
         Self { extensions_dir }
     }
 
-    /// Load an extension from a path
     pub fn load(&self, extension_id: &str) -> Result<LoadedExtension> {
         let ext_dir = self.extensions_dir.join(extension_id);
 
@@ -24,13 +21,10 @@ impl ExtensionLoader {
             )));
         }
 
-        // Find library file
         let lib_path = self.find_library(&ext_dir)?;
 
         tracing::info!("Loading extension {} from {:?}", extension_id, lib_path);
 
-        // In a real implementation, this would use libloading to load the .so/.dylib
-        // For now, return a placeholder
         Ok(LoadedExtension {
             id: extension_id.to_string(),
             path: lib_path,
@@ -38,7 +32,6 @@ impl ExtensionLoader {
         })
     }
 
-    /// Find library file in extension directory
     fn find_library(&self, ext_dir: &PathBuf) -> Result<PathBuf> {
         for ext in &[".so", ".dylib", ".dll"] {
             let lib_path = ext_dir.join(format!("libext{}", ext));
@@ -53,7 +46,6 @@ impl ExtensionLoader {
     }
 }
 
-/// Loaded extension info
 pub struct LoadedExtension {
     pub id: String,
     pub path: PathBuf,
@@ -72,7 +64,6 @@ mod tests {
         let ext_dir = tmp.path().join("extensions").join("com.test.ext");
         fs::create_dir_all(&ext_dir).unwrap();
 
-        // Create a dummy library file
         fs::write(ext_dir.join("libext.so"), "dummy").unwrap();
 
         let loader = ExtensionLoader::new(tmp.path().join("extensions"));

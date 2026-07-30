@@ -6,7 +6,6 @@ use serde::{Deserialize, Serialize};
 use qcker_common::error::{QckerError, Result};
 use qcker_common::hash::sha256_str;
 
-/// Build cache entry
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CacheEntry {
     pub key: String,
@@ -14,25 +13,21 @@ pub struct CacheEntry {
     pub created_at: String,
 }
 
-/// Build cache manager
 pub struct BuildCache {
     pub cache_dir: PathBuf,
 }
 
 impl BuildCache {
-    /// Create a new build cache
     pub fn new(cache_dir: PathBuf) -> Self {
         Self { cache_dir }
     }
 
-    /// Initialize the cache
     pub fn init(&self) -> Result<()> {
         fs::create_dir_all(&self.cache_dir)
             .map_err(|e| QckerError::Internal(format!("Failed to create cache dir: {}", e)))?;
         Ok(())
     }
 
-    /// Compute cache key for an instruction
     pub fn compute_key(
         &self,
         instruction: &str,
@@ -43,12 +38,10 @@ impl BuildCache {
         sha256_str(&input)
     }
 
-    /// Check if cache entry exists
     pub fn has_entry(&self, key: &str) -> bool {
         self.cache_dir.join(key).exists()
     }
 
-    /// Get cache entry
     pub fn get_entry(&self, key: &str) -> Result<Option<CacheEntry>> {
         let entry_dir = self.cache_dir.join(key);
         if !entry_dir.exists() {
@@ -69,7 +62,6 @@ impl BuildCache {
         Ok(Some(entry))
     }
 
-    /// Store cache entry
     pub fn store_entry(&self, key: &str, layer_digest: &str) -> Result<()> {
         let entry_dir = self.cache_dir.join(key);
         fs::create_dir_all(&entry_dir)
@@ -91,7 +83,6 @@ impl BuildCache {
         Ok(())
     }
 
-    /// Clear the cache
     pub fn clear(&self) -> Result<()> {
         if self.cache_dir.exists() {
             fs::remove_dir_all(&self.cache_dir)
@@ -112,14 +103,11 @@ mod tests {
         let cache = BuildCache::new(tmp.path().to_path_buf());
         cache.init().unwrap();
 
-        // Compute key
         let key = cache.compute_key("RUN echo hello", "abc123", "parent_key");
         assert!(!key.is_empty());
 
-        // Store entry
         cache.store_entry(&key, "sha256:layer123").unwrap();
 
-        // Get entry
         let entry = cache.get_entry(&key).unwrap().unwrap();
         assert_eq!(entry.layer_digest, "sha256:layer123");
     }

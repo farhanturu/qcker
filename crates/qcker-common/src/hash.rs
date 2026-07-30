@@ -5,7 +5,6 @@ use std::path::Path;
 
 use crate::error::Result;
 
-/// Compute SHA256 hash of a file
 pub fn sha256_file(path: &Path) -> Result<String> {
     let file = File::open(path)?;
     let mut reader = BufReader::new(file);
@@ -23,19 +22,16 @@ pub fn sha256_file(path: &Path) -> Result<String> {
     Ok(hex::encode(hasher.finalize()))
 }
 
-/// Compute SHA256 hash of bytes
 pub fn sha256_bytes(data: &[u8]) -> String {
     let mut hasher = Sha256::new();
     hasher.update(data);
     hex::encode(hasher.finalize())
 }
 
-/// Compute SHA256 hash of a string
 pub fn sha256_str(s: &str) -> String {
     sha256_bytes(s.as_bytes())
 }
 
-/// Format as content-addressable digest (sha256:hex)
 pub fn content_digest(hash: &str) -> String {
     format!("sha256:{}", hash)
 }

@@ -1,7 +1,6 @@
 use qcker_common::error::{QckerError, Result};
 use serde::{Deserialize, Serialize};
 
-/// Seccomp action
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum SeccompAction {
     Allow,
@@ -24,23 +23,19 @@ impl SeccompAction {
     }
 }
 
-/// Seccomp profile
 #[derive(Debug, Clone)]
 pub struct SeccompProfile {
     pub default_action: SeccompAction,
     pub syscalls: Vec<SeccompSyscallRule>,
 }
 
-/// Seccomp syscall rule
 #[derive(Debug, Clone)]
 pub struct SeccompSyscallRule {
     pub names: Vec<String>,
     pub action: SeccompAction,
 }
 
-/// Apply default seccomp profile
 pub fn apply_default_profile() -> Result<()> {
-    // Set NO_NEW_PRIVS first
     unsafe {
         let ret = libc::prctl(libc::PR_SET_NO_NEW_PRIVS, 1, 0, 0, 0);
         if ret != 0 {
@@ -51,7 +46,6 @@ pub fn apply_default_profile() -> Result<()> {
         }
     }
 
-    // Try to load seccomp filter via libseccomp
     match apply_seccomp_filter() {
         Ok(_) => {
             tracing::info!("Seccomp filter applied");
@@ -59,15 +53,12 @@ pub fn apply_default_profile() -> Result<()> {
         }
         Err(e) => {
             tracing::warn!("Seccomp filter not applied (libseccomp unavailable): {}", e);
-            // NO_NEW_PRIVS is still set, which provides some protection
             Ok(())
         }
     }
 }
 
-/// Apply seccomp filter using libseccomp
 fn apply_seccomp_filter() -> Result<()> {
-    // Blocked syscalls - Docker default profile
     let blocked_syscalls = vec![
         "ptrace",
         "mount",
@@ -103,24 +94,13 @@ fn apply_seccomp_filter() -> Result<()> {
         "pivot_root",
     ];
 
-    // In a real implementation, this would use libseccomp:
-    // let mut ctx = ScmpFilterContext::new(ScmpAction::Allow)?;
-    // for syscall in blocked_syscalls {
-    //     let nr = ScmpSyscall::from_name(syscall)?;
-    //     ctx.add_rule(ScmpAction::Errno(EPERM), nr)?;
-    // }
-    // ctx.set_no_new_privs(true)?;
-    // ctx.load()?;
 
-    // For now, just log the blocked syscalls
     tracing::debug!("Would block {} syscalls", blocked_syscalls.len());
 
     Ok(())
 }
 
-/// Apply a custom seccomp profile
 pub fn apply_profile(profile: &SeccompProfile) -> Result<()> {
-    // Set NO_NEW_PRIVS
     unsafe {
         let ret = libc::prctl(libc::PR_SET_NO_NEW_PRIVS, 1, 0, 0, 0);
         if ret != 0 {
@@ -140,7 +120,6 @@ pub fn apply_profile(profile: &SeccompProfile) -> Result<()> {
     Ok(())
 }
 
-/// Load seccomp profile from JSON
 pub fn load_profile_from_json(json: &str) -> Result<SeccompProfile> {
     let value: serde_json::Value = serde_json::from_str(json)
         .map_err(|e| QckerError::Seccomp(format!("Failed to parse seccomp profile: {}", e)))?;
@@ -179,7 +158,6 @@ pub fn load_profile_from_json(json: &str) -> Result<SeccompProfile> {
     })
 }
 
-/// Create a restrictive seccomp profile
 pub fn create_restrictive_profile() -> SeccompProfile {
     SeccompProfile {
         default_action: SeccompAction::Allow,

@@ -69,7 +69,6 @@ fn create_essential_dirs(rootfs: &Path) -> Result<()> {
 }
 
 fn create_essential_files(rootfs: &Path, config: &RootfsConfig) -> Result<()> {
-    // DNS
     let resolv_conf = rootfs.join("etc/resolv.conf");
     let dns_content: String = config.dns_servers.iter()
         .map(|s| format!("nameserver {}\n", s))
@@ -77,13 +76,11 @@ fn create_essential_files(rootfs: &Path, config: &RootfsConfig) -> Result<()> {
     fs::write(&resolv_conf, dns_content)
         .map_err(|e| QckerError::Mount(format!("Failed to create resolv.conf: {}", e)))?;
 
-    // Hostname
     let hostname = config.hostname.as_deref().unwrap_or("container");
     let hostname_file = rootfs.join("etc/hostname");
     fs::write(&hostname_file, format!("{}\n", hostname))
         .map_err(|e| QckerError::Mount(format!("Failed to create hostname: {}", e)))?;
 
-    // Hosts
     let hosts = rootfs.join("etc/hosts");
     fs::write(&hosts, format!("127.0.0.1 localhost\n::1 localhost\n127.0.0.1 {}\n", hostname))
         .map_err(|e| QckerError::Mount(format!("Failed to create hosts: {}", e)))?;

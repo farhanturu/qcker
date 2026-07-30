@@ -22,6 +22,7 @@ serde_json = { workspace = true }
 indicatif = { workspace = true }
 dirs = "5"
 nix = { workspace = true }
+libc = "0.2"
 tokio = { workspace = true }
 ratatui = "0.28"
 crossterm = "0.28"

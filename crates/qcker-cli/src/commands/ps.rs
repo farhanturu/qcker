@@ -4,10 +4,8 @@ use std::path::Path;
 
 use crate::output;
 
-/// List containers
 #[derive(Args)]
 pub struct PsArgs {
-    /// Show all containers
     #[arg(short, long)]
     all: bool,
 }
@@ -42,7 +40,6 @@ pub fn execute(args: PsArgs, data_dir: &Path, format: &str) -> anyhow::Result<()
         let state = container["state"].as_str().unwrap_or("unknown").to_string();
         let pid = container["pid"].as_i64().map(|p| p as i32);
 
-        // Filter by state unless --all
         if !args.all && state != "running" {
             continue;
         }

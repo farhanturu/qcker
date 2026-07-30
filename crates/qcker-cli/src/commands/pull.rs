@@ -4,13 +4,10 @@ use std::path::Path;
 use crate::output;
 use qcker_engine::registry::client::RegistryClient;
 
-/// Pull an image from a registry
 #[derive(Args)]
 pub struct PullArgs {
-    /// Image reference (e.g., alpine:latest)
     image: String,
 
-    /// Registry URL
     #[arg(long, default_value = "registry-1.docker.io")]
     registry: String,
 }

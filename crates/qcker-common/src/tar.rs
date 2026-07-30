@@ -9,7 +9,6 @@ use tar::{Archive, Builder};
 use crate::error::Result;
 use crate::hash::sha256_file;
 
-/// Extract a tar archive to a destination directory
 pub fn extract_tar(archive_path: &Path, dest: &Path) -> Result<()> {
     let file = File::open(archive_path)?;
     let mut archive = Archive::new(file);
@@ -17,7 +16,6 @@ pub fn extract_tar(archive_path: &Path, dest: &Path) -> Result<()> {
     Ok(())
 }
 
-/// Extract a gzipped tar archive to a destination directory
 pub fn extract_tar_gz(archive_path: &Path, dest: &Path) -> Result<()> {
     let file = File::open(archive_path)?;
     let decoder = GzDecoder::new(file);
@@ -26,14 +24,12 @@ pub fn extract_tar_gz(archive_path: &Path, dest: &Path) -> Result<()> {
     Ok(())
 }
 
-/// Extract tar from a reader
 pub fn extract_tar_from_reader<R: Read>(reader: R, dest: &Path) -> Result<()> {
     let mut archive = Archive::new(reader);
     archive.unpack(dest)?;
     Ok(())
 }
 
-/// Create a tar archive from a directory
 pub fn create_tar(source: &Path, dest: &Path) -> Result<()> {
     let file = File::create(dest)?;
     let mut builder = Builder::new(file);
@@ -42,7 +38,6 @@ pub fn create_tar(source: &Path, dest: &Path) -> Result<()> {
     Ok(())
 }
 
-/// Create a gzipped tar archive from a directory
 pub fn create_tar_gz(source: &Path, dest: &Path) -> Result<()> {
     let file = File::create(dest)?;
     let encoder = GzEncoder::new(file, Compression::default());
@@ -52,7 +47,6 @@ pub fn create_tar_gz(source: &Path, dest: &Path) -> Result<()> {
     Ok(())
 }
 
-/// Compute SHA256 of a tar.gz file (used for layer digest)
 pub fn tar_gz_digest(path: &Path) -> Result<String> {
     sha256_file(path)
 }
@@ -72,7 +66,6 @@ mod tests {
 
         let tar_path = tmp.path().join("test.tar");
 
-        // Create tar from subdirectory
         create_tar(&src_dir, &tar_path).unwrap();
         assert!(tar_path.exists());
     }

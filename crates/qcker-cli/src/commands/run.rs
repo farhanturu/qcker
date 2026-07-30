@@ -94,45 +94,35 @@ pub struct RunArgs {
 }
 
 pub fn execute(args: RunArgs, data_dir: &Path, format: &str) -> anyhow::Result<()> {
-    // Validate arguments
     if args.rootfs.is_none() && args.image.is_none() {
         return Err(anyhow::anyhow!("Either --rootfs or --image must be specified"));
     }
 
     let container_id = args.name.unwrap_or_else(id::generate_container_id);
 
-    // Determine rootfs path
     let rootfs_path = if let Some(rootfs) = args.rootfs {
         rootfs
     } else if let Some(image) = &args.image {
-        // TODO: Pull image and extract to rootfs
-        // For now, return error if no rootfs
         return Err(anyhow::anyhow!("--image support not yet implemented, use --rootfs"));
     } else {
         return Err(anyhow::anyhow!("Either --rootfs or --image must be specified"));
     };
 
-    // Build environment variables
     let mut env_vars = args.env.clone();
     env_vars.push("PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin".to_string());
 
-    // Build DNS servers
     let dns_servers = if args.dns.is_empty() {
         vec!["8.8.8.8".to_string(), "8.8.4.4".to_string()]
     } else {
         args.dns.clone()
     };
 
-    // Parse port mappings
     let port_mappings: Vec<String> = args.publish.iter().map(|p| p.clone()).collect();
 
-    // Parse volume mounts
     let volume_mounts: Vec<String> = args.volume.iter().map(|v| v.clone()).collect();
 
-    // Build hostname
     let hostname = args.hostname.unwrap_or_else(|| container_id[..12.min(container_id.len())].to_string());
 
-    // Build OCI config
     let config = OciConfig {
         oci_version: "1.0.0".to_string(),
         root: RootConfig {
@@ -164,7 +154,6 @@ pub fn execute(args: RunArgs, data_dir: &Path, format: &str) -> anyhow::Result<(
         }),
     };
 
-    // Resource limits
     let resource_limits = ResourceLimits {
         cpu_cores: args.cpus,
         cpu_shares: args.cpu_shares,
@@ -176,7 +165,6 @@ pub fn execute(args: RunArgs, data_dir: &Path, format: &str) -> anyhow::Result<(
         vram_mb: args.vram,
     };
 
-    // Create and start container
     let mut container = ContainerProcess::new(
         &container_id,
         &rootfs_path,
@@ -186,7 +174,6 @@ pub fn execute(args: RunArgs, data_dir: &Path, format: &str) -> anyhow::Result<(
 
     container.create()?;
 
-    // Apply resource limits
     if resource_limits.cpu_cores.is_some()
         || resource_limits.memory_mb.is_some()
         || resource_limits.pids_limit.is_some()
@@ -197,7 +184,6 @@ pub fn execute(args: RunArgs, data_dir: &Path, format: &str) -> anyhow::Result<(
 
     container.start()?;
 
-    // Print container info
     output::print_container_state(
         &container_id,
         "running",
@@ -205,17 +191,14 @@ pub fn execute(args: RunArgs, data_dir: &Path, format: &str) -> anyhow::Result<(
         format,
     );
 
-    // Log port mappings
     if !port_mappings.is_empty() {
         tracing::info!("Port mappings: {:?}", port_mappings);
     }
 
-    // Log volume mounts
     if !volume_mounts.is_empty() {
         tracing::info!("Volume mounts: {:?}", volume_mounts);
     }
 
-    // Wait for container if not detached
     if !args.detach {
         let exit_code = container.wait()?;
         output::print_success(&format!(
@@ -223,7 +206,6 @@ pub fn execute(args: RunArgs, data_dir: &Path, format: &str) -> anyhow::Result<(
             container_id, exit_code
         ));
 
-        // Auto-remove if --rm
         if args.rm {
             container.delete()?;
             tracing::info!("Container {} removed", container_id);
@@ -242,7 +224,6 @@ fn build_namespaces(network: &str) -> Vec<NamespaceConfig> {
         NamespaceConfig { r#type: NamespaceType::Cgroup, path: None },
     ];
 
-    // Only add network namespace if not host mode
     if network != "host" {
         namespaces.push(NamespaceConfig { r#type: NamespaceType::Network, path: None });
     }

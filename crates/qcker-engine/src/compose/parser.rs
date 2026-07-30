@@ -4,7 +4,6 @@ use std::path::Path;
 
 use qcker_common::error::{QckerError, Result};
 
-/// Docker Compose file
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ComposeFile {
     pub version: Option<String>,
@@ -13,7 +12,6 @@ pub struct ComposeFile {
     pub volumes: Option<HashMap<String, VolumeConfig>>,
 }
 
-/// Service configuration
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ServiceConfig {
     pub image: Option<String>,
@@ -35,7 +33,6 @@ pub struct ServiceConfig {
     pub extra_hosts: Option<Vec<String>>,
 }
 
-/// Build configuration
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(untagged)]
 pub enum BuildConfig {
@@ -47,7 +44,6 @@ pub enum BuildConfig {
     },
 }
 
-/// Command configuration (string or array)
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(untagged)]
 pub enum CommandConfig {
@@ -55,7 +51,6 @@ pub enum CommandConfig {
     Array(Vec<String>),
 }
 
-/// Environment configuration (list or map)
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(untagged)]
 pub enum EnvConfig {
@@ -63,7 +58,6 @@ pub enum EnvConfig {
     Map(HashMap<String, String>),
 }
 
-/// Depends on configuration
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(untagged)]
 pub enum DependsOnConfig {
@@ -71,13 +65,11 @@ pub enum DependsOnConfig {
     Detailed(HashMap<String, DependencyConfig>),
 }
 
-/// Dependency configuration
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DependencyConfig {
     pub condition: Option<String>,
 }
 
-/// Network configuration in compose
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct NetworkConfig {
     pub driver: Option<String>,
@@ -86,7 +78,6 @@ pub struct NetworkConfig {
     pub labels: Option<HashMap<String, String>>,
 }
 
-/// Volume configuration in compose
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct VolumeConfig {
     pub driver: Option<String>,
@@ -96,20 +87,17 @@ pub struct VolumeConfig {
 }
 
 impl ComposeFile {
-    /// Parse a compose file from YAML
     pub fn parse(content: &str) -> Result<Self> {
         serde_yaml::from_str(content)
             .map_err(|e| QckerError::InvalidArgument(format!("Failed to parse compose file: {}", e)))
     }
 
-    /// Parse a compose file from path
     pub fn parse_file(path: &Path) -> Result<Self> {
         let content = std::fs::read_to_string(path)
             .map_err(|e| QckerError::Internal(format!("Failed to read compose file: {}", e)))?;
         Self::parse(&content)
     }
 
-    /// Get service names in dependency order
     pub fn get_service_order(&self) -> Result<Vec<String>> {
         let mut order = Vec::new();
         let mut visited = std::collections::HashSet::new();
@@ -124,7 +112,6 @@ impl ComposeFile {
         Ok(order)
     }
 
-    /// Visit service for topological sort
     fn visit_service(
         &self,
         name: &str,
@@ -145,7 +132,6 @@ impl ComposeFile {
 
         visiting.insert(name.to_string());
 
-        // Visit dependencies first
         if let Some(service) = self.services.get(name) {
             if let Some(ref deps) = service.depends_on {
                 match deps {
@@ -170,7 +156,6 @@ impl ComposeFile {
         Ok(())
     }
 
-    /// Get command as vec of strings
     pub fn get_command(cmd: &Option<CommandConfig>) -> Option<Vec<String>> {
         match cmd {
             Some(CommandConfig::Simple(s)) => Some(vec!["/bin/sh".to_string(), "-c".to_string(), s.clone()]),
@@ -179,7 +164,6 @@ impl ComposeFile {
         }
     }
 
-    /// Get environment as vec of KEY=VALUE strings
     pub fn get_env(env: &Option<EnvConfig>) -> Vec<String> {
         match env {
             Some(EnvConfig::List(list)) => list.clone(),
@@ -233,7 +217,6 @@ services:
         let compose = ComposeFile::parse(yaml).unwrap();
         let order = compose.get_service_order().unwrap();
 
-        // db should come before app, app before web
         let db_pos = order.iter().position(|n| n == "db").unwrap();
         let app_pos = order.iter().position(|n| n == "app").unwrap();
         let web_pos = order.iter().position(|n| n == "web").unwrap();

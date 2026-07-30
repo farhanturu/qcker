@@ -3,7 +3,6 @@ use std::path::Path;
 
 use qcker_engine::extension::manager::ExtensionManager;
 
-/// Manage extensions
 #[derive(Args)]
 pub struct ExtensionArgs {
     #[command(subcommand)]
@@ -12,31 +11,20 @@ pub struct ExtensionArgs {
 
 #[derive(Subcommand)]
 pub enum ExtensionCommand {
-    /// List installed extensions
     Ls,
-    /// Install an extension
     Install {
-        /// Extension path or name
         path: String,
     },
-    /// Uninstall an extension
     Uninstall {
-        /// Extension ID
         id: String,
     },
-    /// Enable an extension
     Enable {
-        /// Extension ID
         id: String,
     },
-    /// Disable an extension
     Disable {
-        /// Extension ID
         id: String,
     },
-    /// Show extension info
     Info {
-        /// Extension ID
         id: String,
     },
 }

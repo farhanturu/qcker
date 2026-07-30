@@ -2,7 +2,6 @@ use std::fs;
 
 use qcker_common::error::{QckerError, Result};
 
-/// User namespace mapping configuration
 pub struct UserMapping {
     pub container_uid: u32,
     pub host_uid: u32,
@@ -10,18 +9,14 @@ pub struct UserMapping {
     pub host_gid: u32,
 }
 
-/// Setup user namespace mapping
 pub fn setup_user_mapping(mapping: &UserMapping) -> Result<()> {
-    // Write UID mapping
     let uid_map = format!("{} {} 1", mapping.container_uid, mapping.host_uid);
     fs::write("/proc/self/uid_map", &uid_map)
         .map_err(|e| QckerError::Namespace(format!("Failed to write uid_map: {}", e)))?;
 
-    // Write deny to setgroups before gid_map
     fs::write("/proc/self/setgroups", "deny")
         .map_err(|e| QckerError::Namespace(format!("Failed to write setgroups: {}", e)))?;
 
-    // Write GID mapping
     let gid_map = format!("{} {} 1", mapping.container_gid, mapping.host_gid);
     fs::write("/proc/self/gid_map", &gid_map)
         .map_err(|e| QckerError::Namespace(format!("Failed to write gid_map: {}", e)))?;
@@ -29,20 +24,16 @@ pub fn setup_user_mapping(mapping: &UserMapping) -> Result<()> {
     Ok(())
 }
 
-/// Set UID/GID for container process
 pub fn set_uid_gid(uid: u32, gid: u32) -> Result<()> {
-    // Set GID first
     nix::unistd::setgid(nix::unistd::Gid::from_raw(gid))
         .map_err(|e| QckerError::Namespace(format!("Failed to set GID: {}", e)))?;
 
-    // Set UID
     nix::unistd::setuid(nix::unistd::Uid::from_raw(uid))
         .map_err(|e| QckerError::Namespace(format!("Failed to set UID: {}", e)))?;
 
     Ok(())
 }
 
-/// Parse user string (e.g., "1000:1000" or "root")
 pub fn parse_user(user: &str) -> Result<(u32, u32)> {
     if user.contains(':') {
         let parts: Vec<&str> = user.split(':').collect();
@@ -60,7 +51,6 @@ pub fn parse_user(user: &str) -> Result<(u32, u32)> {
             .map_err(|_| QckerError::InvalidArgument(format!("Invalid GID: {}", parts[1])))?;
         Ok((uid, gid))
     } else {
-        // Try to parse as UID
         let uid = user
             .parse::<u32>()
             .map_err(|_| QckerError::InvalidArgument(format!("Invalid user: {}", user)))?;

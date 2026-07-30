@@ -4,7 +4,6 @@ use std::path::PathBuf;
 
 use qcker_common::error::{QckerError, Result};
 
-/// Volume configuration
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct VolumeConfig {
     pub name: String,
@@ -14,18 +13,15 @@ pub struct VolumeConfig {
     pub created_at: String,
 }
 
-/// Volume manager
 pub struct VolumeManager {
     pub data_dir: PathBuf,
 }
 
 impl VolumeManager {
-    /// Create a new volume manager
     pub fn new(data_dir: PathBuf) -> Self {
         Self { data_dir }
     }
 
-    /// Initialize the volume manager
     pub fn init(&self) -> Result<()> {
         let volumes_dir = self.data_dir.join("volumes");
         fs::create_dir_all(&volumes_dir)
@@ -33,7 +29,6 @@ impl VolumeManager {
         Ok(())
     }
 
-    /// Create a volume
     pub fn create(&self, name: &str, driver: &str) -> Result<VolumeConfig> {
         let volumes_dir = self.data_dir.join("volumes");
         let volume_dir = volumes_dir.join(name);
@@ -56,7 +51,6 @@ impl VolumeManager {
             created_at: chrono::Utc::now().to_rfc3339(),
         };
 
-        // Save config
         let config_path = volume_dir.join("config.json");
         let config_json = serde_json::to_string_pretty(&config)
             .map_err(|e| QckerError::Internal(format!("Failed to serialize config: {}", e)))?;
@@ -68,7 +62,6 @@ impl VolumeManager {
         Ok(config)
     }
 
-    /// List all volumes
     pub fn list(&self) -> Result<Vec<VolumeConfig>> {
         let volumes_dir = self.data_dir.join("volumes");
         let mut volumes = Vec::new();
@@ -96,7 +89,6 @@ impl VolumeManager {
         Ok(volumes)
     }
 
-    /// Get a volume by name
     pub fn get(&self, name: &str) -> Result<VolumeConfig> {
         let volumes_dir = self.data_dir.join("volumes");
         let volume_dir = volumes_dir.join(name);
@@ -117,7 +109,6 @@ impl VolumeManager {
         Ok(config)
     }
 
-    /// Remove a volume
     pub fn remove(&self, name: &str) -> Result<()> {
         let volumes_dir = self.data_dir.join("volumes");
         let volume_dir = volumes_dir.join(name);
@@ -137,7 +128,6 @@ impl VolumeManager {
         Ok(())
     }
 
-    /// Get volume mount path
     pub fn get_mount_path(&self, name: &str) -> Result<PathBuf> {
         let config = self.get(name)?;
         Ok(config.mountpoint)
@@ -155,20 +145,16 @@ mod tests {
         let manager = VolumeManager::new(tmp.path().to_path_buf());
         manager.init().unwrap();
 
-        // Create volume
         let volume = manager.create("test-vol", "local").unwrap();
         assert_eq!(volume.name, "test-vol");
         assert_eq!(volume.driver, "local");
 
-        // List volumes
         let volumes = manager.list().unwrap();
         assert_eq!(volumes.len(), 1);
 
-        // Get volume
         let retrieved = manager.get("test-vol").unwrap();
         assert_eq!(retrieved.name, "test-vol");
 
-        // Remove volume
         manager.remove("test-vol").unwrap();
         assert!(manager.get("test-vol").is_err());
     }

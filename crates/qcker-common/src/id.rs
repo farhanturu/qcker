@@ -1,27 +1,22 @@
 use sha2::{Digest, Sha256};
 use std::time::{SystemTime, UNIX_EPOCH};
 
-/// Generate a new unique container ID
 pub fn generate_container_id() -> String {
     generate_id()
 }
 
-/// Generate a new unique image ID
 pub fn generate_image_id() -> String {
     generate_id()
 }
 
-/// Generate a new unique network ID
 pub fn generate_network_id() -> String {
     generate_id()
 }
 
-/// Generate a new unique volume ID
 pub fn generate_volume_id() -> String {
     generate_id()
 }
 
-/// Generate a unique ID using timestamp + counter
 fn generate_id() -> String {
     let timestamp = SystemTime::now()
         .duration_since(UNIX_EPOCH)

@@ -1,4 +1,3 @@
-/// Unified error types for Qcker
 #[derive(Debug, thiserror::Error)]
 pub enum QckerError {
     #[error("Container not found: {0}")]
@@ -56,5 +55,4 @@ pub enum QckerError {
     Internal(String),
 }
 
-/// Result type alias for Qcker operations
 pub type Result<T> = std::result::Result<T, QckerError>;

@@ -4,13 +4,10 @@ use std::path::Path;
 use crate::output;
 use qcker_runtime::process::ContainerProcess;
 
-/// Delete a container
 #[derive(Args)]
 pub struct DeleteArgs {
-    /// Container ID or name
     container_id: String,
 
-    /// Force delete even if running
     #[arg(short, long)]
     force: bool,
 }

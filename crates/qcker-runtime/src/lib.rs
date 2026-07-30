@@ -11,5 +11,4 @@ pub mod spec;
 pub mod terminal;
 pub mod user;
 
-// Re-export key types
 pub use spec::{Container, ContainerState, OciConfig};

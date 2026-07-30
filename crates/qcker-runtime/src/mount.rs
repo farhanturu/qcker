@@ -4,7 +4,6 @@ use std::path::Path;
 
 use qcker_common::error::{QckerError, Result};
 
-/// Setup rootfs with OverlayFS
 pub fn setup_rootfs(
     lower_dirs: &[&Path],
     upper_dir: &Path,
@@ -12,7 +11,6 @@ pub fn setup_rootfs(
     merged_dir: &Path,
     rootless: bool,
 ) -> Result<()> {
-    // Create directories
     fs::create_dir_all(upper_dir)
         .map_err(|e| QckerError::Mount(format!("Failed to create upper dir: {}", e)))?;
     fs::create_dir_all(work_dir)
@@ -21,24 +19,20 @@ pub fn setup_rootfs(
         .map_err(|e| QckerError::Mount(format!("Failed to create merged dir: {}", e)))?;
 
     if rootless {
-        // Use fuse-overlayfs for rootless mode
         setup_fuse_overlayfs(lower_dirs, upper_dir, work_dir, merged_dir)?;
     } else {
-        // Use kernel overlayfs
         setup_kernel_overlayfs(lower_dirs, upper_dir, work_dir, merged_dir)?;
     }
 
     Ok(())
 }
 
-/// Setup kernel OverlayFS
 fn setup_kernel_overlayfs(
     lower_dirs: &[&Path],
     upper_dir: &Path,
     work_dir: &Path,
     merged_dir: &Path,
 ) -> Result<()> {
-    // Build lowerdir string (colon-separated)
     let lowerdir = lower_dirs
         .iter()
         .map(|p| p.to_string_lossy().to_string())
@@ -64,21 +58,18 @@ fn setup_kernel_overlayfs(
     Ok(())
 }
 
-/// Setup fuse-overlayfs (for rootless mode)
 fn setup_fuse_overlayfs(
     lower_dirs: &[&Path],
     upper_dir: &Path,
     work_dir: &Path,
     merged_dir: &Path,
 ) -> Result<()> {
-    // Build lowerdir string
     let lowerdir = lower_dirs
         .iter()
         .map(|p| p.to_string_lossy().to_string())
         .collect::<Vec<_>>()
         .join(":");
 
-    // Use fuse-overlayfs command
     let output = std::process::Command::new("fuse-overlayfs")
         .args([
             "-o",
@@ -103,7 +94,6 @@ fn setup_fuse_overlayfs(
     Ok(())
 }
 
-/// Mount proc filesystem
 pub fn mount_proc(rootfs: &Path) -> Result<()> {
     let proc_path = rootfs.join("proc");
     fs::create_dir_all(&proc_path)
@@ -121,7 +111,6 @@ pub fn mount_proc(rootfs: &Path) -> Result<()> {
     Ok(())
 }
 
-/// Mount sysfs
 pub fn mount_sys(rootfs: &Path) -> Result<()> {
     let sys_path = rootfs.join("sys");
     fs::create_dir_all(&sys_path)
@@ -139,13 +128,11 @@ pub fn mount_sys(rootfs: &Path) -> Result<()> {
     Ok(())
 }
 
-/// Mount devtmpfs
 pub fn mount_dev(rootfs: &Path) -> Result<()> {
     let dev_path = rootfs.join("dev");
     fs::create_dir_all(&dev_path)
         .map_err(|e| QckerError::Mount(format!("Failed to create /dev: {}", e)))?;
 
-    // Mount devtmpfs
     mount(
         Some("tmpfs"),
         &dev_path,
@@ -155,34 +142,28 @@ pub fn mount_dev(rootfs: &Path) -> Result<()> {
     )
     .map_err(|e| QckerError::Mount(format!("Failed to mount devtmpfs: {}", e)))?;
 
-    // Create essential device nodes
     create_dev_nodes(&dev_path)?;
 
     Ok(())
 }
 
-/// Create essential device nodes
 fn create_dev_nodes(dev_path: &Path) -> Result<()> {
     use nix::sys::stat::{makedev, mknod, Mode, SFlag};
 
     let mode = Mode::S_IRUSR | Mode::S_IWUSR | Mode::S_IRGRP | Mode::S_IWGRP | Mode::S_IROTH | Mode::S_IWOTH;
 
-    // /dev/null
     let null_path = dev_path.join("null");
     mknod(&null_path, SFlag::S_IFCHR, mode, makedev(1, 3))
         .map_err(|e| QckerError::Mount(format!("Failed to create /dev/null: {}", e)))?;
 
-    // /dev/zero
     let zero_path = dev_path.join("zero");
     mknod(&zero_path, SFlag::S_IFCHR, mode, makedev(1, 5))
         .map_err(|e| QckerError::Mount(format!("Failed to create /dev/zero: {}", e)))?;
 
-    // /dev/urandom
     let urandom_path = dev_path.join("urandom");
     mknod(&urandom_path, SFlag::S_IFCHR, mode, makedev(1, 9))
         .map_err(|e| QckerError::Mount(format!("Failed to create /dev/urandom: {}", e)))?;
 
-    // /dev/random
     let random_path = dev_path.join("random");
     mknod(&random_path, SFlag::S_IFCHR, mode, makedev(1, 8))
         .map_err(|e| QckerError::Mount(format!("Failed to create /dev/random: {}", e)))?;
@@ -190,7 +171,6 @@ fn create_dev_nodes(dev_path: &Path) -> Result<()> {
     Ok(())
 }
 
-/// Setup bind mount
 pub fn bind_mount(source: &Path, destination: &Path, readonly: bool) -> Result<()> {
     fs::create_dir_all(destination)
         .map_err(|e| QckerError::Mount(format!("Failed to create mount point: {}", e)))?;
@@ -206,13 +186,10 @@ pub fn bind_mount(source: &Path, destination: &Path, readonly: bool) -> Result<(
     Ok(())
 }
 
-/// Pivot root to new filesystem
 pub fn pivot_root(new_root: &Path, old_root: &Path) -> Result<()> {
-    // Create old_root directory
     fs::create_dir_all(old_root)
         .map_err(|e| QckerError::Mount(format!("Failed to create old_root: {}", e)))?;
 
-    // Make new_root a mount point
     mount(
         Some(new_root),
         new_root,
@@ -222,7 +199,6 @@ pub fn pivot_root(new_root: &Path, old_root: &Path) -> Result<()> {
     )
     .map_err(|e| QckerError::Mount(format!("Failed to bind mount new_root: {}", e)))?;
 
-    // Use pivot_root syscall
     unsafe {
         let new_root_c = std::ffi::CString::new(new_root.to_str().unwrap()).unwrap();
         let old_root_c = std::ffi::CString::new(old_root.to_str().unwrap()).unwrap();
@@ -235,11 +211,9 @@ pub fn pivot_root(new_root: &Path, old_root: &Path) -> Result<()> {
         }
     }
 
-    // Unmount old root
     nix::mount::umount2(old_root, nix::mount::MntFlags::MNT_DETACH)
         .map_err(|e| QckerError::Mount(format!("Failed to unmount old root: {}", e)))?;
 
-    // Remove old root directory
     fs::remove_dir(old_root)
         .map_err(|e| QckerError::Mount(format!("Failed to remove old root: {}", e)))?;
 

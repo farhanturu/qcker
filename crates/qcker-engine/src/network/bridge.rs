@@ -5,7 +5,6 @@ use qcker_common::error::{QckerError, Result};
 
 use super::types::NetworkConfig;
 
-/// Bridge network implementation
 pub struct BridgeNetwork {
     pub bridge_name: String,
     pub subnet: String,
@@ -14,7 +13,6 @@ pub struct BridgeNetwork {
 }
 
 impl BridgeNetwork {
-    /// Create a new bridge network
     pub fn new(config: &NetworkConfig) -> Result<Self> {
         let bridge_name = format!("qcker-{}", &config.id[..8]);
         let subnet = config.subnet.clone().unwrap_or_else(|| "172.17.0.0/16".to_string());
@@ -28,14 +26,11 @@ impl BridgeNetwork {
         })
     }
 
-    /// Setup the bridge network
     pub fn setup(&self) -> Result<()> {
-        // Check if bridge already exists
         if self.bridge_exists() {
             return Ok(());
         }
 
-        // Create bridge interface
         let output = Command::new("ip")
             .args(["link", "add", &self.bridge_name, "type", "bridge"])
             .output()
@@ -48,7 +43,6 @@ impl BridgeNetwork {
             )));
         }
 
-        // Set bridge IP
         let output = Command::new("ip")
             .args([
                 "addr",
@@ -67,7 +61,6 @@ impl BridgeNetwork {
             )));
         }
 
-        // Bring up bridge
         let output = Command::new("ip")
             .args(["link", "set", &self.bridge_name, "up"])
             .output()
@@ -80,11 +73,9 @@ impl BridgeNetwork {
             )));
         }
 
-        // Enable IP forwarding
         fs::write("/proc/sys/net/ipv4/ip_forward", "1")
             .map_err(|e| QckerError::Network(format!("Failed to enable IP forwarding: {}", e)))?;
 
-        // Setup NAT with iptables
         self.setup_nat()?;
 
         tracing::info!("Bridge network {} created", self.bridge_name);
@@ -92,9 +83,7 @@ impl BridgeNetwork {
         Ok(())
     }
 
-    /// Setup NAT rules
     fn setup_nat(&self) -> Result<()> {
-        // Add MASQUERADE rule for outbound traffic
         let output = Command::new("iptables")
             .args([
                 "-t", "nat", "-A", "POSTROUTING",
@@ -115,7 +104,6 @@ impl BridgeNetwork {
         Ok(())
     }
 
-    /// Check if bridge exists
     fn bridge_exists(&self) -> bool {
         Command::new("ip")
             .args(["link", "show", &self.bridge_name])
@@ -124,12 +112,10 @@ impl BridgeNetwork {
             .unwrap_or(false)
     }
 
-    /// Create veth pair and connect to bridge
     pub fn connect_container(&self, container_id: &str, container_pid: i32) -> Result<()> {
         let veth_host = format!("veth-{}", &container_id[..8]);
         let veth_container = format!("eth0");
 
-        // Create veth pair
         let output = Command::new("ip")
             .args([
                 "link",
@@ -151,7 +137,6 @@ impl BridgeNetwork {
             )));
         }
 
-        // Move container end to container namespace
         let output = Command::new("ip")
             .args([
                 "link",
@@ -170,7 +155,6 @@ impl BridgeNetwork {
             )));
         }
 
-        // Attach host end to bridge
         let output = Command::new("ip")
             .args(["link", "set", &veth_host, "master", &self.bridge_name])
             .output()
@@ -183,7 +167,6 @@ impl BridgeNetwork {
             )));
         }
 
-        // Bring up host end
         let output = Command::new("ip")
             .args(["link", "set", &veth_host, "up"])
             .output()
@@ -205,7 +188,6 @@ impl BridgeNetwork {
         Ok(())
     }
 
-    /// Setup port forwarding
     pub fn setup_port_forward(
         &self,
         host_port: u16,
@@ -243,7 +225,6 @@ impl BridgeNetwork {
         Ok(())
     }
 
-    /// Remove bridge network
     pub fn remove(&self) -> Result<()> {
         if !self.bridge_exists() {
             return Ok(());

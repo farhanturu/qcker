@@ -1,4 +1,3 @@
-/// Output container state
 pub fn print_container_state(id: &str, state: &str, pid: Option<i32>, format: &str) {
     match format {
         "json" => {
@@ -19,7 +18,6 @@ pub fn print_container_state(id: &str, state: &str, pid: Option<i32>, format: &s
     }
 }
 
-/// Output container list
 pub fn print_container_list(containers: &[(String, String, Option<i32>)], format: &str) {
     match format {
         "json" => {
@@ -49,12 +47,10 @@ pub fn print_container_list(containers: &[(String, String, Option<i32>)], format
     }
 }
 
-/// Print success message
 pub fn print_success(message: &str) {
     println!("{}", message);
 }
 
-/// Print error message
 pub fn print_error(message: &str) {
     eprintln!("Error: {}", message);
 }

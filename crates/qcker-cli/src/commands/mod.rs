@@ -13,4 +13,5 @@ pub mod pull;
 pub mod run;
 pub mod start;
 pub mod state;
+pub mod stop;
 pub mod volume;

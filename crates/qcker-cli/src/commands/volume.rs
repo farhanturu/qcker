@@ -3,7 +3,6 @@ use std::path::Path;
 
 use qcker_engine::volume::local::VolumeManager;
 
-/// Manage volumes
 #[derive(Args)]
 pub struct VolumeArgs {
     #[command(subcommand)]
@@ -12,25 +11,17 @@ pub struct VolumeArgs {
 
 #[derive(Subcommand)]
 pub enum VolumeCommand {
-    /// Create a volume
     Create {
-        /// Volume name
         name: String,
 
-        /// Volume driver
         #[arg(short, long, default_value = "local")]
         driver: String,
     },
-    /// Remove a volume
     Rm {
-        /// Volume name
         name: String,
     },
-    /// List volumes
     Ls,
-    /// Inspect a volume
     Inspect {
-        /// Volume name
         name: String,
     },
 }

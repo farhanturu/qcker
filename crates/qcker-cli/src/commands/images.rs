@@ -3,10 +3,8 @@ use std::path::Path;
 
 use qcker_engine::image::store::ImageStore;
 
-/// List images
 #[derive(Args)]
 pub struct ImagesArgs {
-    /// Show all images
     #[arg(short, long)]
     _all: bool,
 }
@@ -56,7 +54,6 @@ pub fn execute(_args: ImagesArgs, data_dir: &Path, format: &str) -> anyhow::Resu
     Ok(())
 }
 
-/// Format size in human-readable format
 fn format_size(size: u64) -> String {
     if size < 1024 {
         format!("{} B", size)

@@ -5,13 +5,10 @@ use std::path::Path;
 use crate::output;
 use qcker_runtime::process::ContainerProcess;
 
-/// Kill a container
 #[derive(Args)]
 pub struct KillArgs {
-    /// Container ID or name
     container_id: String,
 
-    /// Signal to send
     #[arg(short, long, default_value = "SIGKILL")]
     signal: String,
 }

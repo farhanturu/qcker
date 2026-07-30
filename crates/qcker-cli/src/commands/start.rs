@@ -4,10 +4,8 @@ use std::path::Path;
 use crate::output;
 use qcker_runtime::process::ContainerProcess;
 
-/// Start a container
 #[derive(Args)]
 pub struct StartArgs {
-    /// Container ID or name
     container_id: String,
 }
 
