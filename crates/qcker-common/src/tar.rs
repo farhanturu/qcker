@@ -26,7 +26,12 @@ fn validate_entry_path(entry_path: &Path, dest: &Path) -> Result<()> {
         }
     }
 
-    let full_path = dest.join(entry_path);
+    let cleaned = entry_path.strip_prefix(".").unwrap_or(entry_path);
+    if cleaned.as_os_str().is_empty() {
+        return Ok(());
+    }
+
+    let full_path = dest.join(cleaned);
     let canonical_dest = dest.canonicalize().unwrap_or_else(|_| dest.to_path_buf());
     if let Some(parent) = full_path.parent() {
         if let Ok(canonical_parent) = parent.canonicalize() {
@@ -54,7 +59,13 @@ pub fn safe_extract(archive_path: &Path, dest: &Path) -> Result<()> {
         let mut entry = entry?;
         let entry_path = entry.path()?;
         validate_entry_path(&entry_path, dest)?;
-        entry.unpack(dest)?;
+
+        let cleaned = entry_path.strip_prefix(".").unwrap_or(&entry_path);
+        if cleaned.as_os_str().is_empty() {
+            continue;
+        }
+
+        entry.unpack_in(dest)?;
     }
 
     Ok(())
@@ -148,12 +159,39 @@ mod tests {
         fs::write(src_dir.join("hello.txt"), "hello world").unwrap();
 
         let tar_path = tmp.path().join("test.tar");
-        create_tar(&src_dir, &tar_path).unwrap();
+        let file = File::create(&tar_path).unwrap();
+        let mut builder = Builder::new(file);
+        builder.append_path_with_name(src_dir.join("hello.txt"), "hello.txt").unwrap();
+        builder.finish().unwrap();
 
         let dest = tmp.path().join("dest");
         fs::create_dir_all(&dest).unwrap();
 
         let result = safe_extract(&tar_path, &dest);
+        if let Err(ref e) = result {
+            eprintln!("ERROR: {:?}", e);
+        }
         assert!(result.is_ok());
+        assert!(dest.join("hello.txt").exists());
+    }
+
+    #[test]
+    fn test_validate_rejects_dotdot() {
+        let tmp = TempDir::new().unwrap();
+        let dest = tmp.path().join("dest");
+        fs::create_dir_all(&dest).unwrap();
+
+        let result = validate_entry_path(std::path::Path::new("../../etc/passwd"), &dest);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_validate_rejects_absolute() {
+        let tmp = TempDir::new().unwrap();
+        let dest = tmp.path().join("dest");
+        fs::create_dir_all(&dest).unwrap();
+
+        let result = validate_entry_path(std::path::Path::new("/etc/passwd"), &dest);
+        assert!(result.is_err());
     }
 }
