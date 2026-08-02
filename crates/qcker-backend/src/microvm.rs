@@ -20,29 +20,6 @@ use crate::vmm::{self, VmmConfig, VmmManager};
 use crate::vsock::SyncVsockChannel;
 use crate::RuntimeBackend;
 
-/// MicroVM backend using QEMU as the VMM.
-///
-/// Architecture:
-/// ┌─────────────────────────────────────────┐
-/// │  Host (qcker-cli)                       │
-/// │  ┌─────────────────────────────────┐    │
-/// │  │  MicroVmBackend                 │    │
-/// │  │  - Manages VM lifecycle         │    │
-/// │  │  - Sends commands via vsock     │    │
-/// │  │  - Tracks container state       │    │
-/// │  └──────────┬──────────────────────┘    │
-/// │             │ vsock (CID:port)           │
-/// └─────────────┼───────────────────────────┘
-///               │
-/// ┌─────────────┼───────────────────────────┐
-/// │  Guest VM   │                           │
-/// │  ┌──────────▼──────────────────────┐    │
-/// │  │  qcker-guest-agent              │    │
-/// │  │  - Listens on vsock port 7421   │    │
-/// │  │  - Creates/runs containers      │    │
-/// │  │  - Reports stats via vsock      │    │
-/// │  └─────────────────────────────────┘    │
-/// └─────────────────────────────────────────┘
 pub struct MicroVmBackend {
     state: Arc<Mutex<MicroVmState>>,
 }
@@ -83,8 +60,6 @@ impl MicroVmBackend {
         }
     }
 
-    /// Allocate a unique context ID for vsock communication.
-    /// CIDs 0-2 are reserved; we use 3+ for our VMs.
     #[allow(dead_code)]
     fn allocate_cid(&self) -> u32 {
         use std::time::SystemTime;
@@ -92,17 +67,13 @@ impl MicroVmBackend {
             .duration_since(SystemTime::UNIX_EPOCH)
             .unwrap_or_default()
             .as_secs();
-        // Use modulo to keep CID in reasonable range (3-4294967294)
         3 + ((ts % 4294967291) as u32)
     }
 
-    /// Connect to the VM's guest agent via vsock.
     fn connect_vsock(cid: u32) -> Result<SyncVsockChannel, String> {
         SyncVsockChannel::connect(cid, QCKER_VSOCK_PORT)
     }
 
-    /// Send a command to the guest agent and wait for a response.
-    /// The caller must ensure the VM is running before calling this.
     fn send_vm_command(state: &MicroVmState, msg: &HostToVm) -> Result<VmToHost, String> {
         if let Some(ref vsock) = state.vsock {
             vsock.send(msg)?;
@@ -114,7 +85,6 @@ impl MicroVmBackend {
         }
     }
 
-    /// Start the VM and wait for the guest agent to be ready.
     fn start_vm_inner(config: &BackendConfig) -> Result<(VmmManager, SyncVsockChannel, u32), String> {
         let cid = {
             let ts = std::time::SystemTime::now()
@@ -150,7 +120,6 @@ impl MicroVmBackend {
         let mut vmm = VmmManager::start(vmm_config)
             .map_err(|e| format!("Failed to start VMM: {}", e))?;
 
-        // Wait for the VM to boot and the guest agent to be ready.
         let mut vsock = None;
         let max_retries = 30;
         let retry_delay = Duration::from_millis(200);
@@ -164,7 +133,6 @@ impl MicroVmBackend {
 
             match Self::connect_vsock(cid) {
                 Ok(channel) => {
-                    // Verify the guest agent is ready by sending a ping
                     match channel.send(&HostToVm::Ping) {
                         Ok(()) => match channel.recv_timeout(Duration::from_secs(5)) {
                             Ok(VmToHost::Pong) => {
@@ -173,10 +141,7 @@ impl MicroVmBackend {
                                 break;
                             }
                             Ok(VmToHost::VmReady { version, arch }) => {
-                                info!(
-                                    "Guest agent ready: version={}, arch={} (attempt {})",
-                                    version, arch, attempt
-                                );
+                                info!("Guest agent ready: version={}, arch={} (attempt {})", version, arch, attempt);
                                 vsock = Some(channel);
                                 break;
                             }
@@ -213,7 +178,6 @@ impl MicroVmBackend {
         Ok((vmm, vsock, cid))
     }
 
-    /// Convert a host-side ContainerSpec to the protocol's ContainerSpec for the VM.
     fn to_vm_spec(spec: &ContainerSpec) -> VmContainerSpec {
         VmContainerSpec {
             layers: spec.layers.clone(),
@@ -260,7 +224,6 @@ impl MicroVmBackend {
         }
     }
 
-    /// Persist container state to disk.
     fn save_container_state_to_dir(data_dir: &PathBuf, container: &ContainerInfo) -> Result<(), String> {
         let container_dir = data_dir.join("containers").join(&container.id);
         fs::create_dir_all(&container_dir)
@@ -274,7 +237,6 @@ impl MicroVmBackend {
         Ok(())
     }
 
-    /// Load container state from disk.
     fn load_container_state_from_dir(data_dir: &PathBuf, id: &str) -> Result<ContainerInfo, String> {
         let state_path = data_dir.join("containers").join(id).join("state.json");
         if !state_path.exists() {
@@ -287,7 +249,6 @@ impl MicroVmBackend {
         Ok(container)
     }
 
-    /// Delete container state from disk.
     fn delete_container_state_from_dir(data_dir: &PathBuf, id: &str) -> Result<(), String> {
         let container_dir = data_dir.join("containers").join(id);
         if container_dir.exists() {
@@ -297,7 +258,6 @@ impl MicroVmBackend {
         Ok(())
     }
 
-    /// Ensure the VM is running. Starts it if not.
     fn ensure_vm_running(&self) -> Result<(), String> {
         let needs_start = {
             let state = self.state.lock().map_err(|e| format!("Lock error: {}", e))?;
@@ -323,7 +283,6 @@ impl MicroVmBackend {
         Ok(())
     }
 
-    /// Check if VM is running (without holding the lock).
     fn is_vm_running(&self) -> bool {
         self.state
             .lock()
@@ -354,7 +313,6 @@ impl RuntimeBackend for MicroVmBackend {
         state.data_dir = config.data_dir.clone();
         state.status = BackendStatus::NotStarted;
 
-        // Ensure data directories exist
         fs::create_dir_all(&config.data_dir)
             .map_err(|e| format!("Failed to create data dir: {}", e))?;
         fs::create_dir_all(&config.containers_dir())
@@ -370,10 +328,8 @@ impl RuntimeBackend for MicroVmBackend {
     }
 
     async fn create_container(&self, id: &str, spec: &ContainerSpec) -> Result<ContainerInfo, String> {
-        // Ensure VM is running
         self.ensure_vm_running()?;
 
-        // Set up port forwarding if specified
         {
             let mut state = self.state.lock().map_err(|e| format!("Lock error: {}", e))?;
             for pf in &spec.port_forwards {
@@ -390,7 +346,6 @@ impl RuntimeBackend for MicroVmBackend {
             }
         }
 
-        // Send container create command to the guest agent via vsock
         let vm_spec = Self::to_vm_spec(spec);
         let response = {
             let state = self.state.lock().map_err(|e| format!("Lock error: {}", e))?;
@@ -417,13 +372,11 @@ impl RuntimeBackend for MicroVmBackend {
                     log_path: None,
                 };
 
-                // Track in-memory
                 {
                     let mut state = self.state.lock().map_err(|e| format!("Lock error: {}", e))?;
                     state.containers.insert(id.to_string(), container.clone());
                 }
 
-                // Persist to disk
                 let data_dir = {
                     let state = self.state.lock().map_err(|e| format!("Lock error: {}", e))?;
                     state.data_dir.clone()
@@ -433,10 +386,7 @@ impl RuntimeBackend for MicroVmBackend {
                 Ok(container)
             }
             VmToHost::Error { request_type: _, message, code } => {
-                error!(
-                    "Guest agent error creating container: code={}, msg={}",
-                    code, message
-                );
+                error!("Guest agent error creating container: code={}, msg={}", code, message);
                 Err(format!("Guest agent error ({}): {}", code, message))
             }
             other => {
@@ -447,10 +397,8 @@ impl RuntimeBackend for MicroVmBackend {
     }
 
     async fn start_container(&self, id: &str) -> Result<(), String> {
-        // Ensure VM is running
         self.ensure_vm_running()?;
 
-        // Send start command to the guest agent
         let response = {
             let state = self.state.lock().map_err(|e| format!("Lock error: {}", e))?;
             Self::send_vm_command(&state, &HostToVm::ContainerStart {
@@ -462,7 +410,6 @@ impl RuntimeBackend for MicroVmBackend {
             VmToHost::ContainerStarted { id: vm_id } => {
                 info!("Container started in VM: id={}", vm_id);
 
-                // Update in-memory state
                 {
                     let mut state = self.state.lock().map_err(|e| format!("Lock error: {}", e))?;
                     if let Some(container) = state.containers.get_mut(id) {
@@ -470,7 +417,6 @@ impl RuntimeBackend for MicroVmBackend {
                     }
                 }
 
-                // Persist updated state
                 let data_dir = {
                     let state = self.state.lock().map_err(|e| format!("Lock error: {}", e))?;
                     state.data_dir.clone()
@@ -503,12 +449,8 @@ impl RuntimeBackend for MicroVmBackend {
 
         match response {
             VmToHost::ContainerExited { id: vm_id, exit_code, timestamp } => {
-                info!(
-                    "Container killed in VM: id={}, exit_code={}, at={}",
-                    vm_id, exit_code, timestamp
-                );
+                info!("Container killed in VM: id={}, exit_code={}, at={}", vm_id, exit_code, timestamp);
 
-                // Update in-memory state
                 {
                     let mut state = self.state.lock().map_err(|e| format!("Lock error: {}", e))?;
                     if let Some(container) = state.containers.get_mut(id) {
@@ -517,7 +459,6 @@ impl RuntimeBackend for MicroVmBackend {
                     }
                 }
 
-                // Persist
                 let data_dir = {
                     let state = self.state.lock().map_err(|e| format!("Lock error: {}", e))?;
                     state.data_dir.clone()
@@ -541,7 +482,6 @@ impl RuntimeBackend for MicroVmBackend {
             return Err("MicroVM is not running".to_string());
         }
 
-        // If container is running, kill it first (if force)
         let data_dir = {
             let state = self.state.lock().map_err(|e| format!("Lock error: {}", e))?;
             state.data_dir.clone()
@@ -557,7 +497,6 @@ impl RuntimeBackend for MicroVmBackend {
             }
         }
 
-        // Send delete command to the guest agent
         let response = {
             let state = self.state.lock().map_err(|e| format!("Lock error: {}", e))?;
             Self::send_vm_command(&state, &HostToVm::ContainerDelete {
@@ -568,7 +507,6 @@ impl RuntimeBackend for MicroVmBackend {
 
         match response {
             VmToHost::Error { code, message, .. } => {
-                // If the error is "not found", we can still clean up locally
                 if code != "CONTAINER_NOT_FOUND" {
                     return Err(format!("Guest agent error ({}): {}", code, message));
                 }
@@ -579,14 +517,12 @@ impl RuntimeBackend for MicroVmBackend {
             }
         }
 
-        // Remove from in-memory tracking
         {
             let mut state = self.state.lock().map_err(|e| format!("Lock error: {}", e))?;
             state.containers.remove(id);
             state.port_forwarder.clear();
         }
 
-        // Remove from disk
         Self::delete_container_state_from_dir(&data_dir, id)?;
 
         Ok(())
@@ -718,25 +654,20 @@ impl RuntimeBackend for MicroVmBackend {
         let mut state = self.state.lock().map_err(|e| format!("Lock error: {}", e))?;
         state.status = BackendStatus::ShuttingDown;
 
-        // Try to send shutdown command to the guest agent
         if let Some(ref vsock) = state.vsock {
             let _ = vsock.send(&HostToVm::VmShutdown);
             std::thread::sleep(Duration::from_millis(500));
         }
 
-        // Close the vsock connection
         state.vsock = None;
 
-        // Stop the VMM process
         if let Some(mut vmm) = state.vmm.take() {
             info!("Stopping VMM process...");
             let _ = vmm.stop();
         }
 
-        // Clean up port forwards
         state.port_forwarder.clear();
 
-        // Update container states to stopped
         for container in state.containers.values_mut() {
             if container.status == ContainerStatus::Running {
                 container.status = ContainerStatus::Stopped;
@@ -749,16 +680,11 @@ impl RuntimeBackend for MicroVmBackend {
         Ok(())
     }
 
-    // ── File Operations via vsock ──────────────────────────────────
-    // These are implemented by sending exec commands to the guest agent
-    // which runs the equivalent of ls, cat, etc. inside the VM.
-
     async fn list_files(&self, id: &str, path: &str) -> Result<Vec<FileInfo>, String> {
         if !self.is_vm_running() {
             return Err("MicroVM is not running".to_string());
         }
 
-        // Execute `ls -la` inside the container via vsock
         let ls_output = self
             .exec_in_container(
                 id,
@@ -805,7 +731,6 @@ impl RuntimeBackend for MicroVmBackend {
             });
         }
 
-        // Sort: directories first, then alphabetically
         files.sort_by(|a, b| {
             if a.is_dir == b.is_dir {
                 a.name.cmp(&b.name)
@@ -846,11 +771,7 @@ impl RuntimeBackend for MicroVmBackend {
             return Err("MicroVM is not running".to_string());
         }
 
-        // Use hex encoding to safely transfer binary content via the command
-        // This avoids the need for an external base64 crate
         let hex_content = hex::encode(content);
-
-        // Write via xxd decode inside the container (more portable than base64)
         let cmd = format!("echo '{}' | xxd -r -p > {}", hex_content, path);
         let result = self
             .exec_in_container(
