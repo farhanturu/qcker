@@ -11,6 +11,7 @@
 <p align="center">
   <a href="https://opensource.org/licenses/Apache-2.0"><img src="https://img.shields.io/badge/License-Apache_2.0-blue.svg" alt="License"></a>
   <a href="https://www.rust-lang.org/"><img src="https://img.shields.io/badge/Rust-1.70%2B-orange.svg" alt="Rust"></a>
+  <a href="#"><img src="https://img.shields.io/badge/Version-1.1.0-blue.svg" alt="Version"></a>
   <a href="#"><img src="https://img.shields.io/badge/Docker-alternative-blue.svg" alt="Docker Alternative"></a>
 </p>
 
@@ -23,6 +24,16 @@
 <p align="center">
   <strong>Production by PaongLabs</strong>
 </p>
+
+---
+
+## What's New in v1.1
+
+- **Dracula Theme System**: Centralized `theme.rs` with full Dracula color palette, status colors, gauge colors, and semantic naming
+- **Zero Compiler Warnings**: All Rust snake_case, dead_code, unused_import, and clippy warnings resolved across the entire workspace
+- **Improved Error Handling**: All error constructors now follow Rust naming conventions (`snake_case`)
+- **TUI Refinements**: Status bar uses darker background for visual separation, marketplace uses semantic status colors
+- **Cleaner Codebase**: Removed unused imports, dead code annotated, proper variable scoping
 
 ---
 
@@ -110,7 +121,7 @@ sudo ./target/release/qcker run --rootfs /path/to/rootfs \
 - 7 tabs: Containers, Images, Networks, Volumes, Stats, Logs, Extensions
 - Browse and edit files inside containers
 - Real-time stats with CPU/memory bars
-- Dracula-inspired dark theme
+- Dracula-inspired dark theme with semantic color system
 - Mouse support (click, scroll)
 - Auto-refresh
 - Container actions (stop, kill, delete) from TUI

@@ -24,7 +24,7 @@ pub fn setup_namespaces(namespaces: &[NamespaceConfig], rootless: bool) -> Resul
         }
     }
 
-    nix::sched::unshare(flags).map_err(|e| QckerError::Namespace(format!("Failed to unshare: {}", e)))?;
+    nix::sched::unshare(flags).map_err(|e| QckerError::namespace(format!("Failed to unshare: {}", e)))?;
 
     Ok(())
 }
@@ -32,21 +32,21 @@ pub fn setup_namespaces(namespaces: &[NamespaceConfig], rootless: bool) -> Resul
 pub fn setup_user_namespace_mapping(uid: u32, gid: u32) -> Result<()> {
     let uid_map = format!("0 {} 1", uid);
     fs::write("/proc/self/uid_map", &uid_map)
-        .map_err(|e| QckerError::Namespace(format!("Failed to write uid_map: {}", e)))?;
+        .map_err(|e| QckerError::namespace(format!("Failed to write uid_map: {}", e)))?;
 
     fs::write("/proc/self/setgroups", "deny")
-        .map_err(|e| QckerError::Namespace(format!("Failed to write setgroups: {}", e)))?;
+        .map_err(|e| QckerError::namespace(format!("Failed to write setgroups: {}", e)))?;
 
     let gid_map = format!("0 {} 1", gid);
     fs::write("/proc/self/gid_map", &gid_map)
-        .map_err(|e| QckerError::Namespace(format!("Failed to write gid_map: {}", e)))?;
+        .map_err(|e| QckerError::namespace(format!("Failed to write gid_map: {}", e)))?;
 
     Ok(())
 }
 
 pub fn set_container_hostname(hostname: &str) -> Result<()> {
     nix::unistd::sethostname(hostname)
-        .map_err(|e| QckerError::Namespace(format!("Failed to set hostname: {}", e)))?;
+        .map_err(|e| QckerError::namespace(format!("Failed to set hostname: {}", e)))?;
     Ok(())
 }
 
@@ -55,7 +55,7 @@ pub fn enter_namespace(pid: i32, ns_type: NamespaceType) -> Result<()> {
     let ns_file = Path::new(&ns_path);
 
     if !ns_file.exists() {
-        return Err(QckerError::Namespace(format!(
+        return Err(QckerError::namespace(format!(
             "Namespace file not found: {}",
             ns_path
         )));
@@ -64,7 +64,7 @@ pub fn enter_namespace(pid: i32, ns_type: NamespaceType) -> Result<()> {
     let ns_path_c = std::ffi::CString::new(ns_path.as_str()).unwrap();
     let fd = unsafe { libc::open(ns_path_c.as_ptr(), libc::O_RDONLY) };
     if fd < 0 {
-        return Err(QckerError::Namespace(format!(
+        return Err(QckerError::namespace(format!(
             "Failed to open namespace: {}",
             std::io::Error::last_os_error()
         )));
@@ -73,7 +73,7 @@ pub fn enter_namespace(pid: i32, ns_type: NamespaceType) -> Result<()> {
     let ret = unsafe { libc::setns(fd, 0) };
     if ret != 0 {
         unsafe { libc::close(fd); }
-        return Err(QckerError::Namespace(format!(
+        return Err(QckerError::namespace(format!(
             "Failed to enter namespace: {}",
             std::io::Error::last_os_error()
         )));

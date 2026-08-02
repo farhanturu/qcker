@@ -11,7 +11,7 @@ use crate::hash::sha256_file;
 
 fn validate_entry_path(entry_path: &Path, dest: &Path) -> Result<()> {
     if entry_path.is_absolute() {
-        return Err(QckerError::Tar(format!(
+        return Err(QckerError::tar(format!(
             "Absolute path in archive: {}",
             entry_path.display()
         )));
@@ -19,7 +19,7 @@ fn validate_entry_path(entry_path: &Path, dest: &Path) -> Result<()> {
 
     for component in entry_path.components() {
         if component == Component::ParentDir {
-            return Err(QckerError::Tar(format!(
+            return Err(QckerError::tar(format!(
                 "Path traversal in archive: {}",
                 entry_path.display()
             )));
@@ -36,7 +36,7 @@ fn validate_entry_path(entry_path: &Path, dest: &Path) -> Result<()> {
     if let Some(parent) = full_path.parent() {
         if let Ok(canonical_parent) = parent.canonicalize() {
             if !canonical_parent.starts_with(&canonical_dest) {
-                return Err(QckerError::Tar(format!(
+                return Err(QckerError::tar(format!(
                     "Path escapes destination: {}",
                     entry_path.display()
                 )));

@@ -11,13 +11,13 @@ pub struct ContainerIo {
 
 pub fn create_pipes() -> Result<(ContainerIo, ContainerIo)> {
     let (stdin_read, stdin_write) = pipe()
-        .map_err(|e| QckerError::Process(format!("Failed to create stdin pipe: {}", e)))?;
+        .map_err(|e| QckerError::process(format!("Failed to create stdin pipe: {}", e)))?;
 
     let (stdout_read, stdout_write) = pipe()
-        .map_err(|e| QckerError::Process(format!("Failed to create stdout pipe: {}", e)))?;
+        .map_err(|e| QckerError::process(format!("Failed to create stdout pipe: {}", e)))?;
 
     let (stderr_read, stderr_write) = pipe()
-        .map_err(|e| QckerError::Process(format!("Failed to create stderr pipe: {}", e)))?;
+        .map_err(|e| QckerError::process(format!("Failed to create stderr pipe: {}", e)))?;
 
     let parent_io = ContainerIo {
         stdin_fd: Some(stdin_write.as_raw_fd()),
@@ -40,7 +40,7 @@ pub fn redirect_to_null() -> Result<()> {
         nix::fcntl::OFlag::O_RDWR,
         nix::sys::stat::Mode::empty(),
     )
-    .map_err(|e| QckerError::Process(format!("Failed to open /dev/null: {}", e)))?;
+    .map_err(|e| QckerError::process(format!("Failed to open /dev/null: {}", e)))?;
 
     unsafe {
         libc::dup2(dev_null.as_raw_fd(), 0);

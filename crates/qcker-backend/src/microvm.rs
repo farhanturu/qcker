@@ -23,7 +23,6 @@ struct MicroVmState {
 #[derive(Debug, PartialEq)]
 enum BackendStatus {
     NotStarted,
-    Booting,
     Running,
     ShuttingDown,
 }

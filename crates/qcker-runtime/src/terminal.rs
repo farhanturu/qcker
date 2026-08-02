@@ -19,7 +19,7 @@ pub struct Terminal {
 impl Terminal {
     pub fn new() -> Result<Self> {
         let OpenptyResult { master, slave } =
-            openpty(None, None).map_err(|e| QckerError::Process(format!("Failed to open PTY: {}", e)))?;
+            openpty(None, None).map_err(|e| QckerError::process(format!("Failed to open PTY: {}", e)))?;
 
         Ok(Self {
             master,
@@ -38,12 +38,12 @@ impl Terminal {
 
     pub fn set_raw_mode(&self) -> Result<()> {
         let mut termios = termios::tcgetattr(&self.master)
-            .map_err(|e| QckerError::Process(format!("Failed to get terminal attrs: {}", e)))?;
+            .map_err(|e| QckerError::process(format!("Failed to get terminal attrs: {}", e)))?;
 
         termios::cfmakeraw(&mut termios);
 
         termios::tcsetattr(&self.master, SetArg::TCSANOW, &termios)
-            .map_err(|e| QckerError::Process(format!("Failed to set terminal attrs: {}", e)))?;
+            .map_err(|e| QckerError::process(format!("Failed to set terminal attrs: {}", e)))?;
 
         Ok(())
     }
@@ -59,7 +59,7 @@ impl Terminal {
         unsafe {
             let ret = libc::ioctl(self.master.as_raw_fd(), libc::TIOCSWINSZ, &winsize);
             if ret != 0 {
-                return Err(QckerError::Process(format!(
+                return Err(QckerError::process(format!(
                     "Failed to resize terminal: {}",
                     std::io::Error::last_os_error()
                 )));
@@ -79,12 +79,12 @@ pub fn proxy_terminal(master_fd: RawFd) -> Result<()> {
 
     let stdin_fd = unsafe { BorrowedFd::borrow_raw(0) };
     let orig_termios = termios::tcgetattr(stdin_fd)
-        .map_err(|e| QckerError::Process(format!("Failed to get stdin attrs: {}", e)))?;
+        .map_err(|e| QckerError::process(format!("Failed to get stdin attrs: {}", e)))?;
 
     let mut raw_termios = orig_termios.clone();
     termios::cfmakeraw(&mut raw_termios);
     termios::tcsetattr(stdin_fd, SetArg::TCSANOW, &raw_termios)
-        .map_err(|e| QckerError::Process(format!("Failed to set stdin raw mode: {}", e)))?;
+        .map_err(|e| QckerError::process(format!("Failed to set stdin raw mode: {}", e)))?;
 
     loop {
         let mut poll_fds = [
@@ -132,7 +132,7 @@ pub fn proxy_terminal(master_fd: RawFd) -> Result<()> {
     }
 
     termios::tcsetattr(stdin_fd, SetArg::TCSANOW, &orig_termios)
-        .map_err(|e| QckerError::Process(format!("Failed to restore terminal: {}", e)))?;
+        .map_err(|e| QckerError::process(format!("Failed to restore terminal: {}", e)))?;
 
     Ok(())
 }

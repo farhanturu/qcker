@@ -92,7 +92,7 @@ impl ComposeProject {
     pub fn ps(&self) -> Result<Vec<ServiceStatus>> {
         let mut statuses = Vec::new();
 
-        for (name, _) in &self.file.services {
+        for name in self.file.services.keys() {
             statuses.push(ServiceStatus {
                 name: name.clone(),
                 state: "stopped".to_string(),

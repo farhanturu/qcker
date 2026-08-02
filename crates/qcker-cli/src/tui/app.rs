@@ -124,8 +124,11 @@ pub struct FileInfo {
     pub name: String,
     pub path: String,
     pub is_dir: bool,
+    #[allow(dead_code)]
     pub size: u64,
+    #[allow(dead_code)]
     pub permissions: String,
+    #[allow(dead_code)]
     pub modified: String,
 }
 
@@ -483,7 +486,7 @@ impl App {
         if let Ok(entries) = std::fs::read_dir(&logs_dir) {
             for entry in entries.flatten() {
                 let path = entry.path();
-                if path.extension().map_or(false, |e| e == "log") {
+                if path.extension().is_some_and(|e| e == "log") {
                     if let Ok(content) = std::fs::read_to_string(&path) {
                         for line in content.lines().take(500) {
                             let parts: Vec<&str> = line.splitn(3, ' ').collect();
@@ -940,10 +943,12 @@ impl App {
         self.status_message = format!("Auto-refresh: {}", if self.auto_refresh { "ON" } else { "OFF" });
     }
 
+    #[allow(dead_code)]
     pub fn scroll_logs_down(&mut self) {
         self.scroll_offset = self.scroll_offset.saturating_add(5);
     }
 
+    #[allow(dead_code)]
     pub fn scroll_logs_up(&mut self) {
         self.scroll_offset = self.scroll_offset.saturating_sub(5);
     }

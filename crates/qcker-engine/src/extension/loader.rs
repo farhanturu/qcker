@@ -1,4 +1,4 @@
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use qcker_common::error::{QckerError, Result};
 
@@ -15,7 +15,7 @@ impl ExtensionLoader {
         let ext_dir = self.extensions_dir.join(extension_id);
 
         if !ext_dir.exists() {
-            return Err(QckerError::InvalidArgument(format!(
+            return Err(QckerError::invalid_argument(format!(
                 "Extension not found: {}",
                 extension_id
             )));
@@ -32,7 +32,7 @@ impl ExtensionLoader {
         })
     }
 
-    fn find_library(&self, ext_dir: &PathBuf) -> Result<PathBuf> {
+    fn find_library(&self, ext_dir: &Path) -> Result<PathBuf> {
         for ext in &[".so", ".dylib", ".dll"] {
             let lib_path = ext_dir.join(format!("libext{}", ext));
             if lib_path.exists() {
@@ -40,7 +40,7 @@ impl ExtensionLoader {
             }
         }
 
-        Err(QckerError::InvalidArgument(
+        Err(QckerError::invalid_argument(
             "No library file found in extension directory".to_string(),
         ))
     }

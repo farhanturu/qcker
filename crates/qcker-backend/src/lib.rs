@@ -1,3 +1,6 @@
+#![allow(clippy::result_large_err)]
+#![allow(clippy::large_enum_variant)]
+
 pub mod config;
 pub mod fs_share;
 pub mod kernel;

@@ -14,7 +14,7 @@ pub struct ErrorLocation {
 pub struct QckerError {
     pub code: ErrorCode,
     pub message: String,
-    pub location: ErrorLocation,
+    pub location: Box<ErrorLocation>,
     pub source: Option<Box<dyn std::error::Error + Send + Sync>>,
     pub suggestion: Option<String>,
     pub timestamp: String,
@@ -39,11 +39,11 @@ impl QckerError {
         Self {
             code,
             message: message.into(),
-            location: ErrorLocation {
+            location: Box::new(ErrorLocation {
                 file: loc.file().to_string(),
                 line: loc.line(),
                 column: loc.column(),
-            },
+            }),
             source: None,
             suggestion: None,
             timestamp: chrono::Utc::now().to_rfc3339(),
@@ -122,52 +122,52 @@ impl From<&str> for QckerError {
 }
 
 impl QckerError {
-    pub fn ContainerNotFound(id: impl Into<String>) -> Self {
+    pub fn container_not_found(id: impl Into<String>) -> Self {
         QckerError::new(ErrorCode::CONTAINER_NOT_FOUND, format!("Container not found: {}", id.into()))
     }
-    pub fn ImageNotFound(id: impl Into<String>) -> Self {
+    pub fn image_not_found(id: impl Into<String>) -> Self {
         QckerError::new(ErrorCode::IMAGE_NOT_FOUND, format!("Image not found: {}", id.into()))
     }
-    pub fn Namespace(msg: impl Into<String>) -> Self {
+    pub fn namespace(msg: impl Into<String>) -> Self {
         QckerError::new(ErrorCode::RUNTIME_NAMESPACE_CREATE_FAILED, msg)
     }
-    pub fn Cgroup(msg: impl Into<String>) -> Self {
+    pub fn cgroup(msg: impl Into<String>) -> Self {
         QckerError::new(ErrorCode::RUNTIME_CGROUP_CREATE_FAILED, msg)
     }
-    pub fn Mount(msg: impl Into<String>) -> Self {
+    pub fn mount(msg: impl Into<String>) -> Self {
         QckerError::new(ErrorCode::RUNTIME_MOUNT_FAILED, msg)
     }
-    pub fn Seccomp(msg: impl Into<String>) -> Self {
+    pub fn seccomp(msg: impl Into<String>) -> Self {
         QckerError::new(ErrorCode::RUNTIME_SECCOMP_APPLY_FAILED, msg)
     }
-    pub fn Capability(msg: impl Into<String>) -> Self {
+    pub fn capability(msg: impl Into<String>) -> Self {
         QckerError::new(ErrorCode::RUNTIME_CAPABILITY_DROP_FAILED, msg)
     }
-    pub fn Process(msg: impl Into<String>) -> Self {
+    pub fn process(msg: impl Into<String>) -> Self {
         QckerError::new(ErrorCode::CONTAINER_START_FAILED, msg)
     }
-    pub fn OciSpec(msg: impl Into<String>) -> Self {
+    pub fn oci_spec(msg: impl Into<String>) -> Self {
         QckerError::new(ErrorCode::BUILD_DOCKERFILE_PARSE_FAILED, msg)
     }
-    pub fn Tar(msg: impl Into<String>) -> Self {
+    pub fn tar(msg: impl Into<String>) -> Self {
         QckerError::new(ErrorCode::IO_ERROR, msg)
     }
-    pub fn Hash(msg: impl Into<String>) -> Self {
+    pub fn hash(msg: impl Into<String>) -> Self {
         QckerError::new(ErrorCode::IO_ERROR, msg)
     }
-    pub fn InvalidArgument(msg: impl Into<String>) -> Self {
+    pub fn invalid_argument(msg: impl Into<String>) -> Self {
         QckerError::new(ErrorCode::INVALID_ARGUMENT, msg)
     }
-    pub fn PermissionDenied(msg: impl Into<String>) -> Self {
+    pub fn permission_denied(msg: impl Into<String>) -> Self {
         QckerError::new(ErrorCode::PERMISSION_DENIED, msg)
     }
-    pub fn NotSupported(msg: impl Into<String>) -> Self {
+    pub fn not_supported(msg: impl Into<String>) -> Self {
         QckerError::new(ErrorCode::RUNTIME_BACKEND_NOT_AVAILABLE, msg)
     }
-    pub fn Network(msg: impl Into<String>) -> Self {
+    pub fn network(msg: impl Into<String>) -> Self {
         QckerError::new(ErrorCode::NETWORK_CREATE_FAILED, msg)
     }
-    pub fn Internal(msg: impl Into<String>) -> Self {
+    pub fn internal(msg: impl Into<String>) -> Self {
         QckerError::new(ErrorCode::UNKNOWN, msg)
     }
 }

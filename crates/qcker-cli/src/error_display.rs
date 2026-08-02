@@ -1,5 +1,12 @@
 use qcker_error::{QckerError, ErrorSeverity};
 
+/// Display a QckerError in the specified format.
+///
+/// Formats:
+/// - "json"  → structured JSON output
+/// - "quiet" → code + message only
+/// - other   → pretty-printed with color, hints, and source chain
+#[allow(dead_code)]
 pub fn display_error(err: &QckerError, format: &str) {
     match format {
         "json" => display_json(err),

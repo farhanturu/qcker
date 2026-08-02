@@ -34,11 +34,11 @@ pub fn create_rootfs(config: &RootfsConfig) -> Result<PathBuf> {
     let work_dir = container_dir.join("work");
 
     fs::create_dir_all(&rootfs_dir)
-        .map_err(|e| QckerError::Mount(format!("Failed to create rootfs dir: {}", e)))?;
+        .map_err(|e| QckerError::mount(format!("Failed to create rootfs dir: {}", e)))?;
     fs::create_dir_all(&upper_dir)
-        .map_err(|e| QckerError::Mount(format!("Failed to create upper dir: {}", e)))?;
+        .map_err(|e| QckerError::mount(format!("Failed to create upper dir: {}", e)))?;
     fs::create_dir_all(&work_dir)
-        .map_err(|e| QckerError::Mount(format!("Failed to create work dir: {}", e)))?;
+        .map_err(|e| QckerError::mount(format!("Failed to create work dir: {}", e)))?;
 
     if !config.layers.is_empty() {
         let lower_refs: Vec<&Path> = config.layers.iter().map(|p| p.as_path()).collect();
@@ -62,7 +62,7 @@ fn create_essential_dirs(rootfs: &Path) -> Result<()> {
     for dir in &dirs {
         let path = rootfs.join(dir);
         fs::create_dir_all(&path)
-            .map_err(|e| QckerError::Mount(format!("Failed to create {}: {}", dir, e)))?;
+            .map_err(|e| QckerError::mount(format!("Failed to create {}: {}", dir, e)))?;
     }
     Ok(())
 }
@@ -73,16 +73,16 @@ fn create_essential_files(rootfs: &Path, config: &RootfsConfig) -> Result<()> {
         .map(|s| format!("nameserver {}\n", s))
         .collect();
     fs::write(&resolv_conf, dns_content)
-        .map_err(|e| QckerError::Mount(format!("Failed to create resolv.conf: {}", e)))?;
+        .map_err(|e| QckerError::mount(format!("Failed to create resolv.conf: {}", e)))?;
 
     let hostname = config.hostname.as_deref().unwrap_or("container");
     let hostname_file = rootfs.join("etc/hostname");
     fs::write(&hostname_file, format!("{}\n", hostname))
-        .map_err(|e| QckerError::Mount(format!("Failed to create hostname: {}", e)))?;
+        .map_err(|e| QckerError::mount(format!("Failed to create hostname: {}", e)))?;
 
     let hosts = rootfs.join("etc/hosts");
     fs::write(&hosts, format!("127.0.0.1 localhost\n::1 localhost\n127.0.0.1 {}\n", hostname))
-        .map_err(|e| QckerError::Mount(format!("Failed to create hosts: {}", e)))?;
+        .map_err(|e| QckerError::mount(format!("Failed to create hosts: {}", e)))?;
 
     Ok(())
 }
@@ -100,7 +100,7 @@ pub fn enter_rootfs(rootfs: &Path, _rootless: bool) -> Result<()> {
     mount_module::pivot_root(rootfs, &old_root)?;
 
     std::env::set_current_dir("/")
-        .map_err(|e| QckerError::Mount(format!("Failed to chdir to /: {}", e)))?;
+        .map_err(|e| QckerError::mount(format!("Failed to chdir to /: {}", e)))?;
 
     Ok(())
 }

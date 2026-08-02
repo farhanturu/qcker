@@ -36,13 +36,13 @@ impl BuildExecutor {
         let mut user = String::from("root");
         let mut cmd: Option<Vec<String>> = None;
         let mut entrypoint: Option<Vec<String>> = None;
-        let mut current_stage = String::new();
+        let mut _current_stage = String::new();
 
         let build_dir = self.data_dir.join("build").join(qcker_common::id::generate_container_id());
         fs::create_dir_all(&build_dir)?;
 
         for stage in &context.dockerfile.stages {
-            current_stage = stage.base_image.clone();
+            _current_stage = stage.base_image.clone();
 
             for instruction in &stage.instructions {
                 match instruction {
@@ -124,11 +124,11 @@ impl BuildExecutor {
             .current_dir(build_dir.join(workdir.trim_start_matches('/')))
             .envs(env)
             .output()
-            .map_err(|e| QckerError::Internal(format!("Failed to execute RUN: {}", e)))?;
+            .map_err(|e| QckerError::internal(format!("Failed to execute RUN: {}", e)))?;
 
         if !output.status.success() {
             let stderr = String::from_utf8_lossy(&output.stderr);
-            return Err(QckerError::Internal(format!("RUN command failed: {}", stderr)));
+            return Err(QckerError::internal(format!("RUN command failed: {}", stderr)));
         }
 
         Ok(())
@@ -181,6 +181,7 @@ impl BuildExecutor {
         result
     }
 
+    #[allow(dead_code)]
     fn get_base_image(&self, reference: &str) -> Result<Image> {
         let store = ImageStore::new(self.data_dir.clone());
         store.init()?;

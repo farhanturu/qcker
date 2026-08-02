@@ -114,11 +114,10 @@ fn handle_normal_mode(app: &mut App, key: KeyEvent) {
                 app.scroll_offset = 0;
             }
         }
-        KeyCode::Char('G') => {
-            if app.active_tab == ActiveTab::Logs {
+        KeyCode::Char('G')
+            if app.active_tab == ActiveTab::Logs => {
                 app.scroll_offset = app.logs.len().saturating_sub(20);
             }
-        }
         _ => {}
     }
 }

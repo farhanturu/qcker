@@ -5,7 +5,7 @@ pub fn generate_container_id() -> String {
     getrandom::getrandom(&mut random_bytes)
         .expect("Failed to generate random bytes for container ID");
     let mut hasher = Sha256::new();
-    hasher.update(&random_bytes);
+    hasher.update(random_bytes);
     let hash = hasher.finalize();
     hex::encode(hash)
 }
@@ -22,7 +22,7 @@ pub fn generate_network_id() -> String {
     getrandom::getrandom(&mut random_bytes)
         .expect("Failed to generate random bytes for network ID");
     let mut hasher = Sha256::new();
-    hasher.update(&random_bytes);
+    hasher.update(random_bytes);
     let hash = hasher.finalize();
     hex::encode(&hash[..16])
 }
@@ -32,7 +32,7 @@ pub fn generate_volume_id() -> String {
     getrandom::getrandom(&mut random_bytes)
         .expect("Failed to generate random bytes for volume ID");
     let mut hasher = Sha256::new();
-    hasher.update(&random_bytes);
+    hasher.update(random_bytes);
     let hash = hasher.finalize();
     hex::encode(&hash[..16])
 }

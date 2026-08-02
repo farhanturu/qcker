@@ -61,6 +61,7 @@ pub struct IpPool {
     base_ip: [u8; 4],
     prefix_len: u8,
     allocated: HashSet<[u8; 4]>,
+    #[allow(dead_code)]
     next_index: u32,
 }
 

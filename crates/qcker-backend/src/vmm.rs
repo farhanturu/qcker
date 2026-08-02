@@ -21,7 +21,7 @@ pub struct FsShareConfig {
 
 pub struct VmmManager {
     process: Option<std::process::Child>,
-    config: VmmConfig,
+    _config: VmmConfig,
 }
 
 impl VmmManager {
@@ -30,7 +30,7 @@ impl VmmManager {
 
         Ok(Self {
             process: Some(process),
-            config,
+            _config: config,
         })
     }
 
@@ -85,7 +85,7 @@ impl VmmManager {
         cmd.stderr(Stdio::null());
 
         cmd.spawn()
-            .map_err(|e| QckerError::Internal(format!("Failed to start QEMU: {}", e)))
+            .map_err(|e| QckerError::internal(format!("Failed to start QEMU: {}", e)))
     }
 
     pub fn stop(&mut self) -> Result<()> {

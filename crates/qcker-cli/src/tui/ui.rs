@@ -1,25 +1,13 @@
 use ratatui::{
     layout::{Constraint, Direction, Layout, Rect},
-    style::{Color, Modifier, Style},
+    style::{Modifier, Style},
     text::{Line, Span},
     widgets::{Block, Borders, Cell, Clear, Gauge, Paragraph, Row, Table, Tabs},
     Frame,
 };
 
 use super::app::{ActiveTab, App, AppMode};
-
-const BG: Color = Color::Rgb(28, 30, 38);
-const SURFACE: Color = Color::Rgb(40, 42, 54);
-const TEXT: Color = Color::Rgb(248, 248, 242);
-const TEXT_DIM: Color = Color::Rgb(98, 114, 164);
-const ACCENT: Color = Color::Rgb(139, 233, 253);
-const PURPLE: Color = Color::Rgb(189, 147, 249);
-const GREEN: Color = Color::Rgb(80, 250, 123);
-const YELLOW: Color = Color::Rgb(241, 250, 140);
-const RED: Color = Color::Rgb(255, 85, 85);
-const ORANGE: Color = Color::Rgb(255, 184, 108);
-const BORDER: Color = Color::Rgb(68, 71, 90);
-const SELECTED_BG: Color = Color::Rgb(68, 71, 90);
+use super::theme;
 
 pub fn draw(f: &mut Frame, app: &App) {
     let chunks = Layout::default()
@@ -55,12 +43,12 @@ fn draw_header(f: &mut Frame, app: &App, area: Rect) {
         if *tab == app.active_tab {
             Line::from(Span::styled(
                 format!(" {} ", title),
-                Style::default().fg(ACCENT).add_modifier(Modifier::BOLD),
+                Style::default().fg(theme::ACCENT).add_modifier(Modifier::BOLD),
             ))
         } else {
             Line::from(Span::styled(
                 format!(" {} ", title),
-                Style::default().fg(TEXT_DIM),
+                Style::default().fg(theme::TEXT_DIM),
             ))
         }
     }).collect();
@@ -70,23 +58,23 @@ fn draw_header(f: &mut Frame, app: &App, area: Rect) {
     let tabs = Tabs::new(titles)
         .block(Block::default()
             .borders(Borders::BOTTOM)
-            .border_style(Style::default().fg(BORDER))
+            .border_style(Style::default().fg(theme::BORDER))
             .title(Span::styled(
                 " Qcker ",
-                Style::default().fg(PURPLE).add_modifier(Modifier::BOLD),
+                Style::default().fg(theme::PURPLE).add_modifier(Modifier::BOLD),
             ))
             .title_alignment(ratatui::layout::Alignment::Left)
-            .style(Style::default().bg(SURFACE)))
+            .style(Style::default().bg(theme::SURFACE)))
         .select(selected)
-        .highlight_style(Style::default().fg(ACCENT).add_modifier(Modifier::BOLD))
-        .divider(Span::styled(" | ", Style::default().fg(BORDER)));
+        .highlight_style(Style::default().fg(theme::ACCENT).add_modifier(Modifier::BOLD))
+        .divider(Span::styled(" | ", Style::default().fg(theme::BORDER)));
 
     f.render_widget(tabs, area);
 }
 
 fn draw_content(f: &mut Frame, app: &App, area: Rect) {
     let block = Block::default()
-        .style(Style::default().bg(BG));
+        .style(Style::default().bg(theme::BG));
     f.render_widget(block, area);
 
     match app.active_tab {
@@ -109,23 +97,23 @@ fn draw_containers(f: &mut Frame, app: &App, area: Rect) {
         Cell::from("PID"),
         Cell::from("CREATED"),
     ])
-    .style(Style::default().fg(PURPLE).add_modifier(Modifier::BOLD))
+    .style(Style::default().fg(theme::PURPLE).add_modifier(Modifier::BOLD))
     .height(1)
     .bottom_margin(1);
 
     let rows: Vec<Row> = app.containers.iter().enumerate().map(|(i, c)| {
         let style = if i == app.selected_index {
-            Style::default().bg(SELECTED_BG).fg(TEXT)
+            Style::default().bg(theme::SELECTED_BG).fg(theme::TEXT)
         } else {
-            Style::default().fg(TEXT)
+            Style::default().fg(theme::TEXT)
         };
 
         let status_style = match c.status.as_str() {
-            "running" => Style::default().fg(GREEN),
-            "created" => Style::default().fg(YELLOW),
-            "stopped" => Style::default().fg(RED),
-            "paused" => Style::default().fg(ORANGE),
-            _ => Style::default().fg(TEXT_DIM),
+            "running" => Style::default().fg(theme::STATUS_RUNNING),
+            "created" => Style::default().fg(theme::STATUS_CREATED),
+            "stopped" => Style::default().fg(theme::STATUS_STOPPED),
+            "paused" => Style::default().fg(theme::STATUS_PAUSED),
+            _ => Style::default().fg(theme::TEXT_DIM),
         };
 
         let status_icon = match c.status.as_str() {
@@ -167,10 +155,10 @@ fn draw_containers(f: &mut Frame, app: &App, area: Rect) {
         .borders(Borders::NONE)
         .title(Span::styled(
             format!(" Containers ({}) ", app.containers.len()),
-            Style::default().fg(ACCENT).add_modifier(Modifier::BOLD),
+            Style::default().fg(theme::ACCENT).add_modifier(Modifier::BOLD),
         ))
-        .style(Style::default().bg(BG)))
-    .highlight_style(Style::default().bg(SELECTED_BG));
+        .style(Style::default().bg(theme::BG)))
+    .highlight_style(Style::default().bg(theme::SELECTED_BG));
 
     f.render_widget(table, area);
 }
@@ -182,21 +170,21 @@ fn draw_images(f: &mut Frame, app: &App, area: Rect) {
         Cell::from("SIZE"),
         Cell::from("CREATED"),
     ])
-    .style(Style::default().fg(PURPLE).add_modifier(Modifier::BOLD))
+    .style(Style::default().fg(theme::PURPLE).add_modifier(Modifier::BOLD))
     .height(1)
     .bottom_margin(1);
 
     let rows: Vec<Row> = app.images.iter().enumerate().map(|(i, img)| {
         let style = if i == app.selected_index {
-            Style::default().bg(SELECTED_BG).fg(TEXT)
+            Style::default().bg(theme::SELECTED_BG).fg(theme::TEXT)
         } else {
-            Style::default().fg(TEXT)
+            Style::default().fg(theme::TEXT)
         };
 
         Row::new(vec![
             Cell::from(truncate(&img.id, 12)),
             Cell::from(truncate(&img.tags, 30)),
-            Cell::from(Span::styled(truncate(&img.size, 10), Style::default().fg(YELLOW))),
+            Cell::from(Span::styled(truncate(&img.size, 10), Style::default().fg(theme::YELLOW))),
             Cell::from(truncate(&img.created, 16)),
         ])
         .style(style)
@@ -217,10 +205,10 @@ fn draw_images(f: &mut Frame, app: &App, area: Rect) {
         .borders(Borders::NONE)
         .title(Span::styled(
             format!(" Images ({}) ", app.images.len()),
-            Style::default().fg(ACCENT).add_modifier(Modifier::BOLD),
+            Style::default().fg(theme::ACCENT).add_modifier(Modifier::BOLD),
         ))
-        .style(Style::default().bg(BG)))
-    .highlight_style(Style::default().bg(SELECTED_BG));
+        .style(Style::default().bg(theme::BG)))
+    .highlight_style(Style::default().bg(theme::SELECTED_BG));
 
     f.render_widget(table, area);
 }
@@ -232,21 +220,21 @@ fn draw_networks(f: &mut Frame, app: &App, area: Rect) {
         Cell::from("DRIVER"),
         Cell::from("SUBNET"),
     ])
-    .style(Style::default().fg(PURPLE).add_modifier(Modifier::BOLD))
+    .style(Style::default().fg(theme::PURPLE).add_modifier(Modifier::BOLD))
     .height(1)
     .bottom_margin(1);
 
     let rows: Vec<Row> = app.networks.iter().enumerate().map(|(i, n)| {
         let style = if i == app.selected_index {
-            Style::default().bg(SELECTED_BG).fg(TEXT)
+            Style::default().bg(theme::SELECTED_BG).fg(theme::TEXT)
         } else {
-            Style::default().fg(TEXT)
+            Style::default().fg(theme::TEXT)
         };
 
         Row::new(vec![
             Cell::from(truncate(&n.id, 12)),
             Cell::from(truncate(&n.name, 18)),
-            Cell::from(Span::styled(truncate(&n.driver, 10), Style::default().fg(ACCENT))),
+            Cell::from(Span::styled(truncate(&n.driver, 10), Style::default().fg(theme::ACCENT))),
             Cell::from(truncate(&n.subnet, 18)),
         ])
         .style(style)
@@ -267,10 +255,10 @@ fn draw_networks(f: &mut Frame, app: &App, area: Rect) {
         .borders(Borders::NONE)
         .title(Span::styled(
             format!(" Networks ({}) ", app.networks.len()),
-            Style::default().fg(ACCENT).add_modifier(Modifier::BOLD),
+            Style::default().fg(theme::ACCENT).add_modifier(Modifier::BOLD),
         ))
-        .style(Style::default().bg(BG)))
-    .highlight_style(Style::default().bg(SELECTED_BG));
+        .style(Style::default().bg(theme::BG)))
+    .highlight_style(Style::default().bg(theme::SELECTED_BG));
 
     f.render_widget(table, area);
 }
@@ -281,20 +269,20 @@ fn draw_volumes(f: &mut Frame, app: &App, area: Rect) {
         Cell::from("DRIVER"),
         Cell::from("MOUNTPOINT"),
     ])
-    .style(Style::default().fg(PURPLE).add_modifier(Modifier::BOLD))
+    .style(Style::default().fg(theme::PURPLE).add_modifier(Modifier::BOLD))
     .height(1)
     .bottom_margin(1);
 
     let rows: Vec<Row> = app.volumes.iter().enumerate().map(|(i, v)| {
         let style = if i == app.selected_index {
-            Style::default().bg(SELECTED_BG).fg(TEXT)
+            Style::default().bg(theme::SELECTED_BG).fg(theme::TEXT)
         } else {
-            Style::default().fg(TEXT)
+            Style::default().fg(theme::TEXT)
         };
 
         Row::new(vec![
             Cell::from(truncate(&v.name, 18)),
-            Cell::from(Span::styled(truncate(&v.driver, 10), Style::default().fg(ACCENT))),
+            Cell::from(Span::styled(truncate(&v.driver, 10), Style::default().fg(theme::ACCENT))),
             Cell::from(truncate(&v.mountpoint, 40)),
         ])
         .style(style)
@@ -314,10 +302,10 @@ fn draw_volumes(f: &mut Frame, app: &App, area: Rect) {
         .borders(Borders::NONE)
         .title(Span::styled(
             format!(" Volumes ({}) ", app.volumes.len()),
-            Style::default().fg(ACCENT).add_modifier(Modifier::BOLD),
+            Style::default().fg(theme::ACCENT).add_modifier(Modifier::BOLD),
         ))
-        .style(Style::default().bg(BG)))
-    .highlight_style(Style::default().bg(SELECTED_BG));
+        .style(Style::default().bg(theme::BG)))
+    .highlight_style(Style::default().bg(theme::SELECTED_BG));
 
     f.render_widget(table, area);
 }
@@ -328,15 +316,15 @@ fn draw_stats(f: &mut Frame, app: &App, area: Rect) {
             Line::from(""),
             Line::from(Span::styled(
                 "  No running containers",
-                Style::default().fg(TEXT_DIM),
+                Style::default().fg(theme::TEXT_DIM),
             )),
             Line::from(""),
             Line::from(Span::styled(
                 "  Start a container to see real-time stats",
-                Style::default().fg(TEXT_DIM),
+                Style::default().fg(theme::TEXT_DIM),
             )),
         ])
-        .style(Style::default().bg(BG));
+        .style(Style::default().bg(theme::BG));
         f.render_widget(msg, area);
         return;
     }
@@ -358,8 +346,8 @@ fn draw_stats(f: &mut Frame, app: &App, area: Rect) {
             0.0
         };
 
-        let cpu_color = if cpu_ratio > 0.8 { RED } else if cpu_ratio > 0.5 { YELLOW } else { GREEN };
-        let mem_color = if mem_ratio > 0.8 { RED } else if mem_ratio > 0.5 { YELLOW } else { GREEN };
+        let cpu_color = if cpu_ratio > 0.8 { theme::GAUGE_HIGH } else if cpu_ratio > 0.5 { theme::GAUGE_MED } else { theme::GAUGE_LOW };
+        let mem_color = if mem_ratio > 0.8 { theme::GAUGE_HIGH } else if mem_ratio > 0.5 { theme::GAUGE_MED } else { theme::GAUGE_LOW };
 
         let inner = Layout::default()
             .direction(Direction::Vertical)
@@ -372,40 +360,40 @@ fn draw_stats(f: &mut Frame, app: &App, area: Rect) {
             .split(chunks[i]);
 
         let title = Paragraph::new(Line::from(vec![
-            Span::styled(" ", Style::default().fg(TEXT)),
-            Span::styled(truncate(&stat.name, 20), Style::default().fg(ACCENT).add_modifier(Modifier::BOLD)),
-            Span::styled(format!(" ({})", truncate(&stat.id, 12)), Style::default().fg(TEXT_DIM)),
+            Span::styled(" ", Style::default().fg(theme::TEXT)),
+            Span::styled(truncate(&stat.name, 20), Style::default().fg(theme::ACCENT).add_modifier(Modifier::BOLD)),
+            Span::styled(format!(" ({})", truncate(&stat.id, 12)), Style::default().fg(theme::TEXT_DIM)),
         ]))
-        .style(Style::default().bg(BG));
+        .style(Style::default().bg(theme::BG));
         f.render_widget(title, inner[0]);
 
         let cpu_gauge = Gauge::default()
-            .block(Block::default().style(Style::default().bg(BG)))
-            .gauge_style(Style::default().fg(cpu_color).bg(SURFACE))
+            .block(Block::default().style(Style::default().bg(theme::BG)))
+            .gauge_style(Style::default().fg(cpu_color).bg(theme::SURFACE))
             .ratio(cpu_ratio)
             .label(Span::styled(
                 format!("CPU: {:.1}%", stat.cpu_percent),
-                Style::default().fg(TEXT),
+                Style::default().fg(theme::TEXT),
             ));
         f.render_widget(cpu_gauge, inner[1]);
 
         let mem_gauge = Gauge::default()
-            .block(Block::default().style(Style::default().bg(BG)))
-            .gauge_style(Style::default().fg(mem_color).bg(SURFACE))
+            .block(Block::default().style(Style::default().bg(theme::BG)))
+            .gauge_style(Style::default().fg(mem_color).bg(theme::SURFACE))
             .ratio(mem_ratio)
             .label(Span::styled(
                 format!("MEM: {:.0}/{:.0} MB", stat.memory_mb, stat.memory_limit_mb),
-                Style::default().fg(TEXT),
+                Style::default().fg(theme::TEXT),
             ));
         f.render_widget(mem_gauge, inner[2]);
 
         let info = Paragraph::new(Line::from(vec![
             Span::styled("  ", Style::default()),
-            Span::styled(format!("PIDs: {} ", stat.pids), Style::default().fg(TEXT_DIM)),
-            Span::styled(format!("NET: {}↓ {}↑ ", format_bytes(stat.net_rx), format_bytes(stat.net_tx)), Style::default().fg(ACCENT)),
-            Span::styled(format!("IO: {}↓ {}↑", format_bytes(stat.block_rx), format_bytes(stat.block_tx)), Style::default().fg(YELLOW)),
+            Span::styled(format!("PIDs: {} ", stat.pids), Style::default().fg(theme::TEXT_DIM)),
+            Span::styled(format!("NET: {}↓ {}↑ ", format_bytes(stat.net_rx), format_bytes(stat.net_tx)), Style::default().fg(theme::ACCENT)),
+            Span::styled(format!("IO: {}↓ {}↑", format_bytes(stat.block_rx), format_bytes(stat.block_tx)), Style::default().fg(theme::YELLOW)),
         ]))
-        .style(Style::default().bg(BG));
+        .style(Style::default().bg(theme::BG));
         f.render_widget(info, inner[3]);
     }
 }
@@ -418,17 +406,17 @@ fn draw_logs(f: &mut Frame, app: &App, area: Rect) {
 
     let logs: Vec<Line> = app.logs[start..end].iter().map(|l| {
         let level_style = match l.level.as_str() {
-            "ERROR" | "ERR" => Style::default().fg(RED),
-            "WARN" | "WARNING" => Style::default().fg(YELLOW),
-            "INFO" => Style::default().fg(ACCENT),
-            "DEBUG" | "TRACE" => Style::default().fg(TEXT_DIM),
-            _ => Style::default().fg(TEXT),
+            "ERROR" | "ERR" => Style::default().fg(theme::GAUGE_HIGH),
+            "WARN" | "WARNING" => Style::default().fg(theme::GAUGE_MED),
+            "INFO" => Style::default().fg(theme::ACCENT),
+            "DEBUG" | "TRACE" => Style::default().fg(theme::TEXT_DIM),
+            _ => Style::default().fg(theme::TEXT),
         };
 
         Line::from(vec![
-            Span::styled(format!(" {} ", l.timestamp), Style::default().fg(TEXT_DIM)),
+            Span::styled(format!(" {} ", l.timestamp), Style::default().fg(theme::TEXT_DIM)),
             Span::styled(format!("{:5} ", l.level), level_style),
-            Span::styled(truncate(&l.message, 120), Style::default().fg(TEXT)),
+            Span::styled(truncate(&l.message, 120), Style::default().fg(theme::TEXT)),
         ])
     }).collect();
 
@@ -437,9 +425,9 @@ fn draw_logs(f: &mut Frame, app: &App, area: Rect) {
             .borders(Borders::NONE)
             .title(Span::styled(
                 format!(" Logs ({}) ", total),
-                Style::default().fg(ACCENT).add_modifier(Modifier::BOLD),
+                Style::default().fg(theme::ACCENT).add_modifier(Modifier::BOLD),
             ))
-            .style(Style::default().bg(BG)));
+            .style(Style::default().bg(theme::BG)));
 
     f.render_widget(paragraph, area);
 }
@@ -452,29 +440,29 @@ fn draw_marketplace(f: &mut Frame, app: &App, area: Rect) {
         Cell::from("STATUS"),
         Cell::from("DESCRIPTION"),
     ])
-    .style(Style::default().fg(PURPLE).add_modifier(Modifier::BOLD))
+    .style(Style::default().fg(theme::PURPLE).add_modifier(Modifier::BOLD))
     .height(1)
     .bottom_margin(1);
 
     let rows: Vec<Row> = app.marketplace.iter().enumerate().map(|(i, ext)| {
         let style = if i == app.selected_index {
-            Style::default().bg(SELECTED_BG).fg(TEXT)
+            Style::default().bg(theme::SELECTED_BG).fg(theme::TEXT)
         } else {
-            Style::default().fg(TEXT)
+            Style::default().fg(theme::TEXT)
         };
 
         let status = if ext.built_in {
-            Span::styled("Built-in", Style::default().fg(GREEN))
+            Span::styled("Built-in", Style::default().fg(theme::STATUS_RUNNING))
         } else if ext.installed {
-            Span::styled("Installed", Style::default().fg(ACCENT))
+            Span::styled("Installed", Style::default().fg(theme::PINK))
         } else {
-            Span::styled("Available", Style::default().fg(YELLOW))
+            Span::styled("Available", Style::default().fg(theme::STATUS_CREATED))
         };
 
         Row::new(vec![
             Cell::from(truncate(&ext.name, 16)),
-            Cell::from(Span::styled(truncate(&ext.version, 8), Style::default().fg(TEXT_DIM))),
-            Cell::from(Span::styled(truncate(&ext.category, 10), Style::default().fg(ACCENT))),
+            Cell::from(Span::styled(truncate(&ext.version, 8), Style::default().fg(theme::TEXT_DIM))),
+            Cell::from(Span::styled(truncate(&ext.category, 10), Style::default().fg(theme::ACCENT))),
             Cell::from(status),
             Cell::from(truncate(&ext.description, 30)),
         ])
@@ -497,10 +485,10 @@ fn draw_marketplace(f: &mut Frame, app: &App, area: Rect) {
         .borders(Borders::NONE)
         .title(Span::styled(
             format!(" Extensions ({}) ", app.marketplace.len()),
-            Style::default().fg(ACCENT).add_modifier(Modifier::BOLD),
+            Style::default().fg(theme::ACCENT).add_modifier(Modifier::BOLD),
         ))
-        .style(Style::default().bg(BG)))
-    .highlight_style(Style::default().bg(SELECTED_BG));
+        .style(Style::default().bg(theme::BG)))
+    .highlight_style(Style::default().bg(theme::SELECTED_BG));
 
     f.render_widget(table, area);
 }
@@ -522,10 +510,10 @@ fn draw_status_bar(f: &mut Frame, app: &App, area: Rect) {
     };
 
     let status = Paragraph::new(Line::from(vec![
-        Span::styled(left, Style::default().fg(YELLOW).bg(SURFACE)),
-        Span::styled(right, Style::default().fg(TEXT_DIM).bg(SURFACE)),
+        Span::styled(left, Style::default().fg(theme::YELLOW).bg(theme::HEADER_BG)),
+        Span::styled(right, Style::default().fg(theme::TEXT_DIM).bg(theme::HEADER_BG)),
     ]))
-    .style(Style::default().bg(SURFACE));
+    .style(Style::default().bg(theme::HEADER_BG));
 
     f.render_widget(status, area);
 }
@@ -549,9 +537,9 @@ fn draw_footer(f: &mut Frame, app: &App, area: Rect) {
 
     let footer = Paragraph::new(Line::from(vec![
         Span::styled(" ", Style::default()),
-        Span::styled(help_text, Style::default().fg(TEXT_DIM).bg(SURFACE)),
+        Span::styled(help_text, Style::default().fg(theme::TEXT_DIM).bg(theme::FOOTER_BG)),
     ]))
-    .style(Style::default().bg(SURFACE));
+    .style(Style::default().bg(theme::FOOTER_BG));
 
     f.render_widget(footer, area);
 }
@@ -565,8 +553,8 @@ fn draw_editor_overlay(f: &mut Frame, app: &App) {
         .map(|(i, line)| {
             let line_num = format!("{:4} ", i + 1);
             Line::from(vec![
-                Span::styled(line_num, Style::default().fg(TEXT_DIM).bg(SURFACE)),
-                Span::styled(truncate(line, 200), Style::default().fg(TEXT)),
+                Span::styled(line_num, Style::default().fg(theme::TEXT_DIM).bg(theme::SURFACE)),
+                Span::styled(truncate(line, 200), Style::default().fg(theme::TEXT)),
             ])
         })
         .collect();
@@ -580,9 +568,9 @@ fn draw_editor_overlay(f: &mut Frame, app: &App) {
     let editor = Paragraph::new(lines)
         .block(Block::default()
             .borders(Borders::ALL)
-            .border_style(Style::default().fg(PURPLE))
-            .title(Span::styled(title, Style::default().fg(ACCENT).add_modifier(Modifier::BOLD)))
-            .style(Style::default().bg(BG)))
+            .border_style(Style::default().fg(theme::PURPLE))
+            .title(Span::styled(title, Style::default().fg(theme::ACCENT).add_modifier(Modifier::BOLD)))
+            .style(Style::default().bg(theme::BG)))
         .wrap(ratatui::widgets::Wrap { trim: false });
 
     f.render_widget(Clear, area);
@@ -596,9 +584,9 @@ fn draw_editor_overlay(f: &mut Frame, app: &App) {
 
     let status_bar = Paragraph::new(Line::from(vec![
         Span::styled(" ", Style::default()),
-        Span::styled(status, Style::default().fg(TEXT_DIM).bg(SURFACE)),
+        Span::styled(status, Style::default().fg(theme::TEXT_DIM).bg(theme::SURFACE)),
     ]))
-    .style(Style::default().bg(SURFACE));
+    .style(Style::default().bg(theme::SURFACE));
 
     let inner = Layout::default()
         .direction(Direction::Vertical)
@@ -615,21 +603,21 @@ fn draw_confirm_popup(f: &mut Frame, app: &App) {
         Line::from(""),
         Line::from(Span::styled(
             format!("  {}", truncate(&app.confirm_message, 40)),
-            Style::default().fg(RED).add_modifier(Modifier::BOLD),
+            Style::default().fg(theme::RED).add_modifier(Modifier::BOLD),
         )),
         Line::from(""),
         Line::from(Span::styled(
             "  y = Yes, n = No",
-            Style::default().fg(TEXT_DIM),
+            Style::default().fg(theme::TEXT_DIM),
         )),
     ];
 
     let popup = Paragraph::new(text)
         .block(Block::default()
             .borders(Borders::ALL)
-            .border_style(Style::default().fg(RED))
-            .title(Span::styled(" Confirm ", Style::default().fg(RED).add_modifier(Modifier::BOLD)))
-            .style(Style::default().bg(SURFACE)))
+            .border_style(Style::default().fg(theme::RED))
+            .title(Span::styled(" Confirm ", Style::default().fg(theme::RED).add_modifier(Modifier::BOLD)))
+            .style(Style::default().bg(theme::SURFACE)))
         .alignment(ratatui::layout::Alignment::Left);
 
     f.render_widget(Clear, area);
@@ -643,22 +631,22 @@ fn draw_command_popup(f: &mut Frame, app: &App) {
         Line::from(""),
         Line::from(Span::styled(
             format!("  {}", truncate(&app.status_message, 40)),
-            Style::default().fg(YELLOW),
+            Style::default().fg(theme::YELLOW),
         )),
         Line::from(""),
         Line::from(vec![
-            Span::styled("  > ", Style::default().fg(ACCENT)),
-            Span::styled(truncate(&app.command_input, 30), Style::default().fg(TEXT)),
-            Span::styled("_", Style::default().fg(TEXT).add_modifier(Modifier::SLOW_BLINK)),
+            Span::styled("  > ", Style::default().fg(theme::ACCENT)),
+            Span::styled(truncate(&app.command_input, 30), Style::default().fg(theme::TEXT)),
+            Span::styled("_", Style::default().fg(theme::TEXT).add_modifier(Modifier::SLOW_BLINK)),
         ]),
     ];
 
     let popup = Paragraph::new(text)
         .block(Block::default()
             .borders(Borders::ALL)
-            .border_style(Style::default().fg(ACCENT))
-            .title(Span::styled(" Input ", Style::default().fg(ACCENT).add_modifier(Modifier::BOLD)))
-            .style(Style::default().bg(SURFACE)));
+            .border_style(Style::default().fg(theme::ACCENT))
+            .title(Span::styled(" Input ", Style::default().fg(theme::ACCENT).add_modifier(Modifier::BOLD)))
+            .style(Style::default().bg(theme::SURFACE)));
 
     f.render_widget(Clear, area);
     f.render_widget(popup, area);
@@ -668,46 +656,46 @@ fn draw_help_popup(f: &mut Frame, _app: &App) {
     let area = centered_rect(50, 60, f.area());
 
     let help_text = vec![
-        Line::from(Span::styled("  Qcker TUI Help", Style::default().fg(PURPLE).add_modifier(Modifier::BOLD))),
+        Line::from(Span::styled("  Qcker TUI Help", Style::default().fg(theme::PURPLE).add_modifier(Modifier::BOLD))),
         Line::from(""),
-        Line::from(Span::styled("  Navigation", Style::default().fg(YELLOW).add_modifier(Modifier::BOLD))),
-        Line::from(Span::styled("  Tab / Shift+Tab   Switch tabs", Style::default().fg(TEXT))),
-        Line::from(Span::styled("  Up/Down or j/k    Navigate items", Style::default().fg(TEXT))),
-        Line::from(Span::styled("  PageUp/PageDown   Scroll pages", Style::default().fg(TEXT))),
-        Line::from(Span::styled("  Mouse click       Select item", Style::default().fg(TEXT))),
-        Line::from(Span::styled("  Mouse scroll      Scroll list", Style::default().fg(TEXT))),
+        Line::from(Span::styled("  Navigation", Style::default().fg(theme::YELLOW).add_modifier(Modifier::BOLD))),
+        Line::from(Span::styled("  Tab / Shift+Tab   Switch tabs", Style::default().fg(theme::TEXT))),
+        Line::from(Span::styled("  Up/Down or j/k    Navigate items", Style::default().fg(theme::TEXT))),
+        Line::from(Span::styled("  PageUp/PageDown   Scroll pages", Style::default().fg(theme::TEXT))),
+        Line::from(Span::styled("  Mouse click       Select item", Style::default().fg(theme::TEXT))),
+        Line::from(Span::styled("  Mouse scroll      Scroll list", Style::default().fg(theme::TEXT))),
         Line::from(""),
-        Line::from(Span::styled("  Containers", Style::default().fg(YELLOW).add_modifier(Modifier::BOLD))),
-        Line::from(Span::styled("  Enter             Browse files", Style::default().fg(TEXT))),
-        Line::from(Span::styled("  s                 Stop container", Style::default().fg(TEXT))),
-        Line::from(Span::styled("  d                 Delete container", Style::default().fg(TEXT))),
+        Line::from(Span::styled("  Containers", Style::default().fg(theme::YELLOW).add_modifier(Modifier::BOLD))),
+        Line::from(Span::styled("  Enter             Browse files", Style::default().fg(theme::TEXT))),
+        Line::from(Span::styled("  s                 Stop container", Style::default().fg(theme::TEXT))),
+        Line::from(Span::styled("  d                 Delete container", Style::default().fg(theme::TEXT))),
         Line::from(""),
-        Line::from(Span::styled("  Files", Style::default().fg(YELLOW).add_modifier(Modifier::BOLD))),
-        Line::from(Span::styled("  Enter             Open file/dir", Style::default().fg(TEXT))),
-        Line::from(Span::styled("  e                 Edit file", Style::default().fg(TEXT))),
-        Line::from(Span::styled("  d                 Delete file", Style::default().fg(TEXT))),
-        Line::from(Span::styled("  n                 New file", Style::default().fg(TEXT))),
-        Line::from(Span::styled("  m                 New directory", Style::default().fg(TEXT))),
-        Line::from(Span::styled("  Backspace         Go up", Style::default().fg(TEXT))),
+        Line::from(Span::styled("  Files", Style::default().fg(theme::YELLOW).add_modifier(Modifier::BOLD))),
+        Line::from(Span::styled("  Enter             Open file/dir", Style::default().fg(theme::TEXT))),
+        Line::from(Span::styled("  e                 Edit file", Style::default().fg(theme::TEXT))),
+        Line::from(Span::styled("  d                 Delete file", Style::default().fg(theme::TEXT))),
+        Line::from(Span::styled("  n                 New file", Style::default().fg(theme::TEXT))),
+        Line::from(Span::styled("  m                 New directory", Style::default().fg(theme::TEXT))),
+        Line::from(Span::styled("  Backspace         Go up", Style::default().fg(theme::TEXT))),
         Line::from(""),
-        Line::from(Span::styled("  Editor", Style::default().fg(YELLOW).add_modifier(Modifier::BOLD))),
-        Line::from(Span::styled("  Ctrl+S            Save", Style::default().fg(TEXT))),
-        Line::from(Span::styled("  Esc               Close", Style::default().fg(TEXT))),
-        Line::from(Span::styled("  Arrow keys        Move cursor", Style::default().fg(TEXT))),
+        Line::from(Span::styled("  Editor", Style::default().fg(theme::YELLOW).add_modifier(Modifier::BOLD))),
+        Line::from(Span::styled("  Ctrl+S            Save", Style::default().fg(theme::TEXT))),
+        Line::from(Span::styled("  Esc               Close", Style::default().fg(theme::TEXT))),
+        Line::from(Span::styled("  Arrow keys        Move cursor", Style::default().fg(theme::TEXT))),
         Line::from(""),
-        Line::from(Span::styled("  General", Style::default().fg(YELLOW).add_modifier(Modifier::BOLD))),
-        Line::from(Span::styled("  r                 Refresh", Style::default().fg(TEXT))),
-        Line::from(Span::styled("  a                 Toggle auto-refresh", Style::default().fg(TEXT))),
-        Line::from(Span::styled("  h                 Help", Style::default().fg(TEXT))),
-        Line::from(Span::styled("  q                 Quit", Style::default().fg(TEXT))),
+        Line::from(Span::styled("  General", Style::default().fg(theme::YELLOW).add_modifier(Modifier::BOLD))),
+        Line::from(Span::styled("  r                 Refresh", Style::default().fg(theme::TEXT))),
+        Line::from(Span::styled("  a                 Toggle auto-refresh", Style::default().fg(theme::TEXT))),
+        Line::from(Span::styled("  h                 Help", Style::default().fg(theme::TEXT))),
+        Line::from(Span::styled("  q                 Quit", Style::default().fg(theme::TEXT))),
     ];
 
     let help = Paragraph::new(help_text)
         .block(Block::default()
             .borders(Borders::ALL)
-            .border_style(Style::default().fg(PURPLE))
-            .title(Span::styled(" Help ", Style::default().fg(ACCENT).add_modifier(Modifier::BOLD)))
-            .style(Style::default().bg(SURFACE)));
+            .border_style(Style::default().fg(theme::PURPLE))
+            .title(Span::styled(" Help ", Style::default().fg(theme::ACCENT).add_modifier(Modifier::BOLD)))
+            .style(Style::default().bg(theme::SURFACE)));
 
     f.render_widget(Clear, area);
     f.render_widget(help, area);

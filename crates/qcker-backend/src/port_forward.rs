@@ -14,6 +14,12 @@ struct PortForward {
     protocol: String,
 }
 
+impl Default for PortForwarder {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl PortForwarder {
     pub fn new() -> Self {
         Self {

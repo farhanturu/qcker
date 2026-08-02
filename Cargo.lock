@@ -1375,7 +1375,7 @@ dependencies = [
 
 [[package]]
 name = "qcker"
-version = "0.1.0"
+version = "1.1.0"
 dependencies = [
  "anyhow",
  "chrono",
@@ -1399,7 +1399,7 @@ dependencies = [
 
 [[package]]
 name = "qcker-backend"
-version = "0.1.0"
+version = "1.1.0"
 dependencies = [
  "async-trait",
  "chrono",
@@ -1419,7 +1419,7 @@ dependencies = [
 
 [[package]]
 name = "qcker-common"
-version = "0.1.0"
+version = "1.1.0"
 dependencies = [
  "flate2",
  "getrandom 0.2.17",
@@ -1439,7 +1439,7 @@ dependencies = [
 
 [[package]]
 name = "qcker-engine"
-version = "0.1.0"
+version = "1.1.0"
 dependencies = [
  "anyhow",
  "base64",
@@ -1464,7 +1464,7 @@ dependencies = [
 
 [[package]]
 name = "qcker-error"
-version = "0.1.0"
+version = "1.1.0"
 dependencies = [
  "chrono",
  "serde",
@@ -1474,7 +1474,7 @@ dependencies = [
 
 [[package]]
 name = "qcker-ext-api"
-version = "0.1.0"
+version = "1.1.0"
 dependencies = [
  "serde",
  "serde_json",
@@ -1483,7 +1483,7 @@ dependencies = [
 
 [[package]]
 name = "qcker-runtime"
-version = "0.1.0"
+version = "1.1.0"
 dependencies = [
  "anyhow",
  "capctl",

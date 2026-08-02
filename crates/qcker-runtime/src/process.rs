@@ -46,10 +46,10 @@ impl Default for ResourceLimits {
 
 fn close_unneeded_fds(keep_fds: &[i32]) -> Result<()> {
     let fd_dir = std::fs::read_dir("/proc/self/fd")
-        .map_err(|e| QckerError::Process(format!("Failed to read /proc/self/fd: {}", e)))?;
+        .map_err(|e| QckerError::process(format!("Failed to read /proc/self/fd: {}", e)))?;
 
     for entry in fd_dir {
-        let entry = entry.map_err(|e| QckerError::Process(format!("Failed to read fd entry: {}", e)))?;
+        let entry = entry.map_err(|e| QckerError::process(format!("Failed to read fd entry: {}", e)))?;
         let fd_name = entry.file_name();
         let fd_str = fd_name.to_string_lossy();
         if let Ok(fd) = fd_str.parse::<i32>() {
@@ -68,13 +68,13 @@ impl ContainerProcess {
         let container_dir = data_dir.join("containers").join(id);
 
         fs::create_dir_all(&container_dir)
-            .map_err(|e| QckerError::Process(format!("Failed to create container dir: {}", e)))?;
+            .map_err(|e| QckerError::process(format!("Failed to create container dir: {}", e)))?;
 
         let state_path = container_dir.join("state.json");
         let state_json = serde_json::to_string_pretty(&container)
-            .map_err(|e| QckerError::Process(format!("Failed to serialize state: {}", e)))?;
+            .map_err(|e| QckerError::process(format!("Failed to serialize state: {}", e)))?;
         fs::write(&state_path, state_json)
-            .map_err(|e| QckerError::Process(format!("Failed to write state: {}", e)))?;
+            .map_err(|e| QckerError::process(format!("Failed to write state: {}", e)))?;
 
         Ok(Self { container, data_dir, log_path: None })
     }
@@ -86,7 +86,7 @@ impl ContainerProcess {
     pub fn create(&mut self) -> Result<()> {
         let container_dir = self.data_dir.join("containers").join(&self.container.id);
         fs::create_dir_all(&container_dir)
-            .map_err(|e| QckerError::Process(format!("Failed to create container dir: {}", e)))?;
+            .map_err(|e| QckerError::process(format!("Failed to create container dir: {}", e)))?;
 
         self.container.state = ContainerState::Created;
         self.save_state()?;
@@ -95,7 +95,7 @@ impl ContainerProcess {
 
     pub fn start(&mut self) -> Result<()> {
         if self.container.state != ContainerState::Created {
-            return Err(QckerError::Process(format!(
+            return Err(QckerError::process(format!(
                 "Container is in state {:?}, expected Created",
                 self.container.state
             )));
@@ -103,15 +103,15 @@ impl ContainerProcess {
 
         let rootfs = self.container.rootfs.clone();
         let process_config = self.container.config.process.clone()
-            .ok_or_else(|| QckerError::Process("No process configuration".to_string()))?;
+            .ok_or_else(|| QckerError::process("No process configuration".to_string()))?;
 
         let (pipe_read, pipe_write) = nix::unistd::pipe()
-            .map_err(|e| QckerError::Process(format!("Failed to create pipe: {}", e)))?;
+            .map_err(|e| QckerError::process(format!("Failed to create pipe: {}", e)))?;
 
-        match unsafe { fork() }.map_err(|e| QckerError::Process(format!("Fork failed: {}", e)))? {
+        match unsafe { fork() }.map_err(|e| QckerError::process(format!("Fork failed: {}", e)))? {
             ForkResult::Parent { child } => {
                 nix::unistd::close(pipe_write)
-                    .map_err(|e| QckerError::Process(format!("Failed to close pipe: {}", e)))?;
+                    .map_err(|e| QckerError::process(format!("Failed to close pipe: {}", e)))?;
 
                 self.container.pid = Some(child.as_raw());
                 self.container.state = ContainerState::Running;
@@ -125,7 +125,7 @@ impl ContainerProcess {
             }
             ForkResult::Child => {
                 nix::unistd::close(pipe_read)
-                    .map_err(|e| QckerError::Process(format!("Failed to close pipe: {}", e)))?;
+                    .map_err(|e| QckerError::process(format!("Failed to close pipe: {}", e)))?;
 
                 if let Err(e) = self.child_process(&rootfs, &process_config) {
                     eprintln!("qcker: {}", e);
@@ -150,19 +150,19 @@ impl ContainerProcess {
 
         if use_user_ns {
             unshare(CloneFlags::CLONE_NEWUSER)
-                .map_err(|e| QckerError::Process(format!("Failed to unshare user namespace: {}", e)))?;
+                .map_err(|e| QckerError::process(format!("Failed to unshare user namespace: {}", e)))?;
 
             let host_uid = qcker_common::fs::getuid();
             let host_gid = qcker_common::fs::getgid();
 
             fs::write("/proc/self/setgroups", "deny")
-                .map_err(|e| QckerError::Process(format!("Failed to write setgroups: {}", e)))?;
+                .map_err(|e| QckerError::process(format!("Failed to write setgroups: {}", e)))?;
 
             fs::write("/proc/self/uid_map", format!("0 {} 1", host_uid))
-                .map_err(|e| QckerError::Process(format!("Failed to write uid_map: {}", e)))?;
+                .map_err(|e| QckerError::process(format!("Failed to write uid_map: {}", e)))?;
 
             fs::write("/proc/self/gid_map", format!("0 {} 1", host_gid))
-                .map_err(|e| QckerError::Process(format!("Failed to write gid_map: {}", e)))?;
+                .map_err(|e| QckerError::process(format!("Failed to write gid_map: {}", e)))?;
         }
 
         if let Some(ref linux) = self.container.config.linux {
@@ -180,33 +180,33 @@ impl ContainerProcess {
             }
             if !flags.is_empty() {
                 unshare(flags)
-                    .map_err(|e| QckerError::Process(format!("Failed to unshare namespaces: {}", e)))?;
+                    .map_err(|e| QckerError::process(format!("Failed to unshare namespaces: {}", e)))?;
             }
         }
 
         let old_root = rootfs.join(".old_root");
         mount::pivot_root(rootfs, &old_root)
-            .map_err(|e| QckerError::Process(format!("Failed to pivot_root: {}", e)))?;
+            .map_err(|e| QckerError::process(format!("Failed to pivot_root: {}", e)))?;
 
         std::env::set_current_dir("/")
-            .map_err(|e| QckerError::Process(format!("Failed to chdir: {}", e)))?;
+            .map_err(|e| QckerError::process(format!("Failed to chdir: {}", e)))?;
 
         mount::mount_proc(Path::new("/"))
-            .map_err(|e| QckerError::Process(format!("Failed to mount /proc: {}", e)))?;
+            .map_err(|e| QckerError::process(format!("Failed to mount /proc: {}", e)))?;
         mount::mount_sys(Path::new("/"))
-            .map_err(|e| QckerError::Process(format!("Failed to mount /sys: {}", e)))?;
+            .map_err(|e| QckerError::process(format!("Failed to mount /sys: {}", e)))?;
         mount::mount_dev(Path::new("/"))
-            .map_err(|e| QckerError::Process(format!("Failed to mount /dev: {}", e)))?;
+            .map_err(|e| QckerError::process(format!("Failed to mount /dev: {}", e)))?;
         mount::mount_proc_sys_readonly(Path::new("/"))
-            .map_err(|e| QckerError::Process(format!("Failed to mount /proc/sys read-only: {}", e)))?;
+            .map_err(|e| QckerError::process(format!("Failed to mount /proc/sys read-only: {}", e)))?;
         mount::mount_dev_shm(Path::new("/"))
-            .map_err(|e| QckerError::Process(format!("Failed to mount /dev/shm: {}", e)))?;
+            .map_err(|e| QckerError::process(format!("Failed to mount /dev/shm: {}", e)))?;
         mount::mount_dev_mqueue(Path::new("/"))
-            .map_err(|e| QckerError::Process(format!("Failed to mount /dev/mqueue: {}", e)))?;
+            .map_err(|e| QckerError::process(format!("Failed to mount /dev/mqueue: {}", e)))?;
 
         let hostname = self.container.config.hostname.as_deref().unwrap_or(&self.container.id[..12.min(self.container.id.len())]);
         nix::unistd::sethostname(hostname)
-            .map_err(|e| QckerError::Process(format!("Failed to set hostname: {}", e)))?;
+            .map_err(|e| QckerError::process(format!("Failed to set hostname: {}", e)))?;
 
         if let Err(e) = seccomp::apply_default_profile() {
             tracing::warn!("Seccomp filter not applied (may need root): {}", e);
@@ -225,7 +225,7 @@ impl ContainerProcess {
         let _ = std::env::set_current_dir(&process_config.cwd);
 
         if process_config.args.is_empty() {
-            return Err(QckerError::Process("No command specified".to_string()));
+            return Err(QckerError::process("No command specified".to_string()));
         }
 
         if let Some(ref log_path) = self.log_path {
@@ -244,7 +244,7 @@ impl ContainerProcess {
         use std::ffi::CString;
         let cmd = &process_config.args[0];
         let c_cmd = CString::new(cmd.as_str())
-            .map_err(|e| QckerError::Process(format!("Invalid command: {}", e)))?;
+            .map_err(|e| QckerError::process(format!("Invalid command: {}", e)))?;
 
         let c_args: Vec<CString> = process_config.args.iter()
             .map(|s| CString::new(s.as_str()).unwrap())
@@ -258,12 +258,12 @@ impl ContainerProcess {
             libc::execvp(c_cmd.as_ptr(), c_args_ptrs.as_ptr());
         }
 
-        Err(QckerError::Process(format!("Failed to execute {}: {}", cmd, std::io::Error::last_os_error())))
+        Err(QckerError::process(format!("Failed to execute {}: {}", cmd, std::io::Error::last_os_error())))
     }
 
     pub fn start_interactive(&mut self) -> Result<()> {
         if self.container.state != ContainerState::Created {
-            return Err(QckerError::Process(format!(
+            return Err(QckerError::process(format!(
                 "Container is in state {:?}, expected Created",
                 self.container.state
             )));
@@ -271,9 +271,9 @@ impl ContainerProcess {
 
         let rootfs = self.container.rootfs.clone();
         let process_config = self.container.config.process.clone()
-            .ok_or_else(|| QckerError::Process("No process configuration".to_string()))?;
+            .ok_or_else(|| QckerError::process("No process configuration".to_string()))?;
 
-        match unsafe { fork() }.map_err(|e| QckerError::Process(format!("Fork failed: {}", e)))? {
+        match unsafe { fork() }.map_err(|e| QckerError::process(format!("Fork failed: {}", e)))? {
             ForkResult::Parent { child } => {
                 self.container.pid = Some(child.as_raw());
                 self.container.state = ContainerState::Running;
@@ -286,11 +286,11 @@ impl ContainerProcess {
                 match status {
                     Ok(WaitStatus::Exited(_, code)) => {
                         if code != 0 {
-                            return Err(QckerError::Process(format!("Container exited with code {}", code)));
+                            return Err(QckerError::process(format!("Container exited with code {}", code)));
                         }
                     }
                     Ok(WaitStatus::Signaled(_, signal, _)) => {
-                        return Err(QckerError::Process(format!("Container killed by signal {:?}", signal)));
+                        return Err(QckerError::process(format!("Container killed by signal {:?}", signal)));
                     }
                     Err(nix::errno::Errno::ECHILD) => {}
                     _ => {}
@@ -370,7 +370,7 @@ impl ContainerProcess {
         let dev_path = container_root.join("dev");
 
         fs::create_dir_all(&dev_path)
-            .map_err(|e| QckerError::Process(format!("Failed to create dev dir: {}", e)))?;
+            .map_err(|e| QckerError::process(format!("Failed to create dev dir: {}", e)))?;
 
         let gpu_devices = if limits.gpu_devices.is_empty() {
             self.detect_gpu_devices()?
@@ -384,7 +384,7 @@ impl ContainerProcess {
                 let target = dev_path.join(device_path.file_name().unwrap_or_default());
                 if !target.exists() {
                     fs::copy(device_path, &target)
-                        .map_err(|e| QckerError::Process(format!("Failed to copy GPU device: {}", e)))?;
+                        .map_err(|e| QckerError::process(format!("Failed to copy GPU device: {}", e)))?;
                 }
             }
         }
@@ -425,13 +425,13 @@ impl ContainerProcess {
                 if ret != 0 {
                     let err = std::io::Error::last_os_error();
                     if err.raw_os_error() != Some(libc::ESRCH) {
-                        return Err(QckerError::Process(format!("Failed to send signal: {}", err)));
+                        return Err(QckerError::process(format!("Failed to send signal: {}", err)));
                     }
                 }
             }
             Ok(())
         } else {
-            Err(QckerError::Process("Container has no PID".to_string()))
+            Err(QckerError::process("Container has no PID".to_string()))
         }
     }
 
@@ -449,7 +449,7 @@ impl ContainerProcess {
                 }
             }
         } else {
-            Err(QckerError::Process("Container has no PID".to_string()))
+            Err(QckerError::process("Container has no PID".to_string()))
         }
     }
 
@@ -466,7 +466,7 @@ impl ContainerProcess {
         let container_dir = self.data_dir.join("containers").join(&self.container.id);
         if container_dir.exists() {
             fs::remove_dir_all(&container_dir)
-                .map_err(|e| QckerError::Process(format!("Failed to remove container dir: {}", e)))?;
+                .map_err(|e| QckerError::process(format!("Failed to remove container dir: {}", e)))?;
         }
 
         self.container.state = ContainerState::Stopped;
@@ -477,9 +477,9 @@ impl ContainerProcess {
         let container_dir = self.data_dir.join("containers").join(&self.container.id);
         let state_path = container_dir.join("state.json");
         let state_json = serde_json::to_string_pretty(&self.container)
-            .map_err(|e| QckerError::Process(format!("Failed to serialize state: {}", e)))?;
+            .map_err(|e| QckerError::process(format!("Failed to serialize state: {}", e)))?;
         fs::write(&state_path, state_json)
-            .map_err(|e| QckerError::Process(format!("Failed to write state: {}", e)))?;
+            .map_err(|e| QckerError::process(format!("Failed to write state: {}", e)))?;
         Ok(())
     }
 
@@ -489,9 +489,9 @@ impl ContainerProcess {
             .join(container_id)
             .join("state.json");
         let state_json = fs::read_to_string(&state_path)
-            .map_err(|e| QckerError::Process(format!("Failed to read state: {}", e)))?;
+            .map_err(|e| QckerError::process(format!("Failed to read state: {}", e)))?;
         let container: Container = serde_json::from_str(&state_json)
-            .map_err(|e| QckerError::Process(format!("Failed to parse state: {}", e)))?;
+            .map_err(|e| QckerError::process(format!("Failed to parse state: {}", e)))?;
         Ok(container)
     }
 
@@ -500,9 +500,9 @@ impl ContainerProcess {
         let container_pid = self.container.pid;
 
         let (pipe_read, pipe_write) = nix::unistd::pipe()
-            .map_err(|e| QckerError::Process(format!("Failed to create pipe: {}", e)))?;
+            .map_err(|e| QckerError::process(format!("Failed to create pipe: {}", e)))?;
 
-        match unsafe { fork() }.map_err(|e| QckerError::Process(format!("Fork failed: {}", e)))? {
+        match unsafe { fork() }.map_err(|e| QckerError::process(format!("Fork failed: {}", e)))? {
             ForkResult::Parent { child } => {
                 nix::unistd::close(pipe_write).ok();
 
@@ -514,11 +514,11 @@ impl ContainerProcess {
                 match status {
                     Ok(WaitStatus::Exited(_, code)) => {
                         if code != 0 {
-                            return Err(QckerError::Process(format!("Exec exited with code {}", code)));
+                            return Err(QckerError::process(format!("Exec exited with code {}", code)));
                         }
                     }
                     Ok(WaitStatus::Signaled(_, signal, _)) => {
-                        return Err(QckerError::Process(format!("Exec killed by signal {:?}", signal)));
+                        return Err(QckerError::process(format!("Exec killed by signal {:?}", signal)));
                     }
                     Err(nix::errno::Errno::ECHILD) => {}
                     _ => {}

@@ -125,7 +125,7 @@ fn drop_from_bounding_set(caps: &CapSet) -> Result<()> {
                 if ret != 0 {
                     let err = std::io::Error::last_os_error();
                     if err.raw_os_error() != Some(libc::EPERM) {
-                        return Err(QckerError::Capability(format!(
+                        return Err(QckerError::capability(format!(
                             "Failed to drop cap from bounding set: {}",
                             err
                         )));
@@ -160,14 +160,14 @@ pub fn apply_capabilities(caps: &OciCapabilities) -> Result<()> {
     let bounding_set = names_to_set(&caps.bounding);
 
     let mut state = capctl::caps::CapState::get_current()
-        .map_err(|e| QckerError::Capability(format!("Failed to get current caps: {}", e)))?;
+        .map_err(|e| QckerError::capability(format!("Failed to get current caps: {}", e)))?;
 
     state.effective = names_to_set(&caps.effective);
     state.permitted = names_to_set(&caps.permitted);
     state.inheritable = names_to_set(&caps.inheritable);
 
     state.set_current()
-        .map_err(|e| QckerError::Capability(format!("Failed to set caps: {}", e)))?;
+        .map_err(|e| QckerError::capability(format!("Failed to set caps: {}", e)))?;
 
     drop_from_bounding_set(&bounding_set)?;
 
@@ -179,16 +179,16 @@ pub fn apply_capabilities(caps: &OciCapabilities) -> Result<()> {
 pub fn drop_all_capabilities() -> Result<()> {
     let state = capctl::caps::CapState::empty();
     state.set_current()
-        .map_err(|e| QckerError::Capability(format!("Failed to drop caps: {}", e)))?;
+        .map_err(|e| QckerError::capability(format!("Failed to drop caps: {}", e)))?;
 
     let empty_set = CapSet::empty();
     drop_from_bounding_set(&empty_set)?;
 
     let verify = capctl::caps::CapState::get_current()
-        .map_err(|e| QckerError::Capability(format!("Failed to verify caps: {}", e)))?;
+        .map_err(|e| QckerError::capability(format!("Failed to verify caps: {}", e)))?;
 
     if !verify.effective.is_empty() || !verify.permitted.is_empty() {
-        return Err(QckerError::Capability("Failed to verify capability drop".to_string()));
+        return Err(QckerError::capability("Failed to verify capability drop".to_string()));
     }
 
     Ok(())

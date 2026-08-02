@@ -42,7 +42,7 @@ pub fn create_bind_mount_spec(
 ) -> Result<FsShareConfig> {
     let host = PathBuf::from(host_path);
     if !host.exists() {
-        return Err(QckerError::InvalidArgument(format!(
+        return Err(QckerError::invalid_argument(format!(
             "Host path does not exist: {}",
             host_path
         )));

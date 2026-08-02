@@ -25,7 +25,7 @@ impl VolumeManager {
     pub fn init(&self) -> Result<()> {
         let volumes_dir = self.data_dir.join("volumes");
         fs::create_dir_all(&volumes_dir)
-            .map_err(|e| QckerError::Internal(format!("Failed to create volumes dir: {}", e)))?;
+            .map_err(|e| QckerError::internal(format!("Failed to create volumes dir: {}", e)))?;
         Ok(())
     }
 
@@ -34,14 +34,14 @@ impl VolumeManager {
         let volume_dir = volumes_dir.join(name);
 
         if volume_dir.exists() {
-            return Err(QckerError::InvalidArgument(format!(
+            return Err(QckerError::invalid_argument(format!(
                 "Volume already exists: {}",
                 name
             )));
         }
 
         fs::create_dir_all(&volume_dir)
-            .map_err(|e| QckerError::Internal(format!("Failed to create volume dir: {}", e)))?;
+            .map_err(|e| QckerError::internal(format!("Failed to create volume dir: {}", e)))?;
 
         let config = VolumeConfig {
             name: name.to_string(),
@@ -53,9 +53,9 @@ impl VolumeManager {
 
         let config_path = volume_dir.join("config.json");
         let config_json = serde_json::to_string_pretty(&config)
-            .map_err(|e| QckerError::Internal(format!("Failed to serialize config: {}", e)))?;
+            .map_err(|e| QckerError::internal(format!("Failed to serialize config: {}", e)))?;
         fs::write(&config_path, config_json)
-            .map_err(|e| QckerError::Internal(format!("Failed to write config: {}", e)))?;
+            .map_err(|e| QckerError::internal(format!("Failed to write config: {}", e)))?;
 
         tracing::info!("Volume {} created", name);
 
@@ -71,17 +71,17 @@ impl VolumeManager {
         }
 
         for entry in fs::read_dir(&volumes_dir)
-            .map_err(|e| QckerError::Internal(format!("Failed to read volumes dir: {}", e)))?
+            .map_err(|e| QckerError::internal(format!("Failed to read volumes dir: {}", e)))?
         {
             let entry = entry
-                .map_err(|e| QckerError::Internal(format!("Failed to read entry: {}", e)))?;
+                .map_err(|e| QckerError::internal(format!("Failed to read entry: {}", e)))?;
             let config_path = entry.path().join("config.json");
 
             if config_path.exists() {
                 let content = fs::read_to_string(&config_path)
-                    .map_err(|e| QckerError::Internal(format!("Failed to read config: {}", e)))?;
+                    .map_err(|e| QckerError::internal(format!("Failed to read config: {}", e)))?;
                 let config: VolumeConfig = serde_json::from_str(&content)
-                    .map_err(|e| QckerError::Internal(format!("Failed to parse config: {}", e)))?;
+                    .map_err(|e| QckerError::internal(format!("Failed to parse config: {}", e)))?;
                 volumes.push(config);
             }
         }
@@ -95,16 +95,16 @@ impl VolumeManager {
         let config_path = volume_dir.join("config.json");
 
         if !config_path.exists() {
-            return Err(QckerError::InvalidArgument(format!(
+            return Err(QckerError::invalid_argument(format!(
                 "Volume not found: {}",
                 name
             )));
         }
 
         let content = fs::read_to_string(&config_path)
-            .map_err(|e| QckerError::Internal(format!("Failed to read config: {}", e)))?;
+            .map_err(|e| QckerError::internal(format!("Failed to read config: {}", e)))?;
         let config: VolumeConfig = serde_json::from_str(&content)
-            .map_err(|e| QckerError::Internal(format!("Failed to parse config: {}", e)))?;
+            .map_err(|e| QckerError::internal(format!("Failed to parse config: {}", e)))?;
 
         Ok(config)
     }
@@ -114,14 +114,14 @@ impl VolumeManager {
         let volume_dir = volumes_dir.join(name);
 
         if !volume_dir.exists() {
-            return Err(QckerError::InvalidArgument(format!(
+            return Err(QckerError::invalid_argument(format!(
                 "Volume not found: {}",
                 name
             )));
         }
 
         fs::remove_dir_all(&volume_dir)
-            .map_err(|e| QckerError::Internal(format!("Failed to remove volume: {}", e)))?;
+            .map_err(|e| QckerError::internal(format!("Failed to remove volume: {}", e)))?;
 
         tracing::info!("Volume {} removed", name);
 

@@ -12,7 +12,7 @@ pub fn create_cgroup(container_id: &str) -> Result<PathBuf> {
 
     if !cgroup_path.exists() {
         std::fs::create_dir_all(&cgroup_path)
-            .map_err(|e| QckerError::Cgroup(format!("Failed to create cgroup: {}", e)))?;
+            .map_err(|e| QckerError::cgroup(format!("Failed to create cgroup: {}", e)))?;
     }
 
     Ok(cgroup_path)
@@ -22,20 +22,20 @@ pub fn apply_resources(cgroup_path: &Path, memory_limit: Option<i64>, cpu_quota:
     if let Some(mem_limit) = memory_limit {
         let path = cgroup_path.join("memory.max");
         std::fs::write(&path, mem_limit.to_string())
-            .map_err(|e| QckerError::Cgroup(format!("Failed to set memory.max: {}", e)))?;
+            .map_err(|e| QckerError::cgroup(format!("Failed to set memory.max: {}", e)))?;
     }
 
     if let Some(quota) = cpu_quota {
         let path = cgroup_path.join("cpu.max");
         let period = 100000i64;
         std::fs::write(&path, format!("{} {}", quota, period))
-            .map_err(|e| QckerError::Cgroup(format!("Failed to set cpu.max: {}", e)))?;
+            .map_err(|e| QckerError::cgroup(format!("Failed to set cpu.max: {}", e)))?;
     }
 
     if let Some(pids) = pids_limit {
         let path = cgroup_path.join("pids.max");
         std::fs::write(&path, pids.to_string())
-            .map_err(|e| QckerError::Cgroup(format!("Failed to set pids.max: {}", e)))?;
+            .map_err(|e| QckerError::cgroup(format!("Failed to set pids.max: {}", e)))?;
     }
 
     Ok(())
@@ -44,14 +44,14 @@ pub fn apply_resources(cgroup_path: &Path, memory_limit: Option<i64>, cpu_quota:
 pub fn add_process(cgroup_path: &Path, pid: i32) -> Result<()> {
     let procs_path = cgroup_path.join("cgroup.procs");
     std::fs::write(&procs_path, pid.to_string())
-        .map_err(|e| QckerError::Cgroup(format!("Failed to add process: {}", e)))?;
+        .map_err(|e| QckerError::cgroup(format!("Failed to add process: {}", e)))?;
     Ok(())
 }
 
 pub fn remove_cgroup(cgroup_path: &Path) -> Result<()> {
     if cgroup_path.exists() {
         std::fs::remove_dir(cgroup_path)
-            .map_err(|e| QckerError::Cgroup(format!("Failed to remove cgroup: {}", e)))?;
+            .map_err(|e| QckerError::cgroup(format!("Failed to remove cgroup: {}", e)))?;
     }
     Ok(())
 }

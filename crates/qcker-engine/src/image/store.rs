@@ -56,31 +56,31 @@ impl ImageStore {
 
     pub fn init(&self) -> Result<()> {
         fs::create_dir_all(self.images_dir())
-            .map_err(|e| QckerError::Internal(format!("Failed to create images dir: {}", e)))?;
+            .map_err(|e| QckerError::internal(format!("Failed to create images dir: {}", e)))?;
         fs::create_dir_all(self.layers_dir())
-            .map_err(|e| QckerError::Internal(format!("Failed to create layers dir: {}", e)))?;
+            .map_err(|e| QckerError::internal(format!("Failed to create layers dir: {}", e)))?;
         Ok(())
     }
 
     pub fn store_image(&self, image: &Image) -> Result<()> {
         let image_dir = self.images_dir().join(&image.id);
         fs::create_dir_all(&image_dir)
-            .map_err(|e| QckerError::Internal(format!("Failed to create image dir: {}", e)))?;
+            .map_err(|e| QckerError::internal(format!("Failed to create image dir: {}", e)))?;
 
         let meta_path = image_dir.join("manifest.json");
         let meta_json = serde_json::to_string_pretty(image)
-            .map_err(|e| QckerError::Internal(format!("Failed to serialize image: {}", e)))?;
+            .map_err(|e| QckerError::internal(format!("Failed to serialize image: {}", e)))?;
         fs::write(&meta_path, meta_json)
-            .map_err(|e| QckerError::Internal(format!("Failed to write manifest: {}", e)))?;
+            .map_err(|e| QckerError::internal(format!("Failed to write manifest: {}", e)))?;
 
         let refs_dir = image_dir.join("refs");
         fs::create_dir_all(&refs_dir)
-            .map_err(|e| QckerError::Internal(format!("Failed to create refs dir: {}", e)))?;
+            .map_err(|e| QckerError::internal(format!("Failed to create refs dir: {}", e)))?;
 
         for tag in &image.tags {
             let tag_file = refs_dir.join(tag.replace('/', "_"));
             fs::write(&tag_file, &image.id)
-                .map_err(|e| QckerError::Internal(format!("Failed to write tag ref: {}", e)))?;
+                .map_err(|e| QckerError::internal(format!("Failed to write tag ref: {}", e)))?;
         }
 
         Ok(())
@@ -93,17 +93,17 @@ impl ImageStore {
         }
 
         for entry in fs::read_dir(self.images_dir())
-            .map_err(|e| QckerError::Internal(format!("Failed to read images dir: {}", e)))?
+            .map_err(|e| QckerError::internal(format!("Failed to read images dir: {}", e)))?
         {
             let entry = entry
-                .map_err(|e| QckerError::Internal(format!("Failed to read entry: {}", e)))?;
+                .map_err(|e| QckerError::internal(format!("Failed to read entry: {}", e)))?;
             let refs_dir = entry.path().join("refs");
             if refs_dir.exists() {
                 for tag_entry in fs::read_dir(&refs_dir)
-                    .map_err(|e| QckerError::Internal(format!("Failed to read refs: {}", e)))?
+                    .map_err(|e| QckerError::internal(format!("Failed to read refs: {}", e)))?
                 {
                     let tag_entry = tag_entry
-                        .map_err(|e| QckerError::Internal(format!("Failed to read tag: {}", e)))?;
+                        .map_err(|e| QckerError::internal(format!("Failed to read tag: {}", e)))?;
                     if tag_entry.file_name().to_string_lossy() == id_or_tag.replace('/', "_") {
                         return self.load_image(&entry.path());
                     }
@@ -111,15 +111,15 @@ impl ImageStore {
             }
         }
 
-        Err(QckerError::ImageNotFound(id_or_tag.to_string()))
+        Err(QckerError::image_not_found(id_or_tag.to_string()))
     }
 
     fn load_image(&self, image_dir: &Path) -> Result<Image> {
         let meta_path = image_dir.join("manifest.json");
         let meta_json = fs::read_to_string(&meta_path)
-            .map_err(|e| QckerError::Internal(format!("Failed to read manifest: {}", e)))?;
+            .map_err(|e| QckerError::internal(format!("Failed to read manifest: {}", e)))?;
         let image: Image = serde_json::from_str(&meta_json)
-            .map_err(|e| QckerError::Internal(format!("Failed to parse manifest: {}", e)))?;
+            .map_err(|e| QckerError::internal(format!("Failed to parse manifest: {}", e)))?;
         Ok(image)
     }
 
@@ -131,10 +131,10 @@ impl ImageStore {
         }
 
         for entry in fs::read_dir(self.images_dir())
-            .map_err(|e| QckerError::Internal(format!("Failed to read images dir: {}", e)))?
+            .map_err(|e| QckerError::internal(format!("Failed to read images dir: {}", e)))?
         {
             let entry = entry
-                .map_err(|e| QckerError::Internal(format!("Failed to read entry: {}", e)))?;
+                .map_err(|e| QckerError::internal(format!("Failed to read entry: {}", e)))?;
             if entry.path().is_dir() {
                 if let Ok(image) = self.load_image(&entry.path()) {
                     images.push(image);
@@ -148,11 +148,11 @@ impl ImageStore {
     pub fn remove_image(&self, id: &str) -> Result<()> {
         let image_dir = self.images_dir().join(id);
         if !image_dir.exists() {
-            return Err(QckerError::ImageNotFound(id.to_string()));
+            return Err(QckerError::image_not_found(id.to_string()));
         }
 
         fs::remove_dir_all(&image_dir)
-            .map_err(|e| QckerError::Internal(format!("Failed to remove image: {}", e)))?;
+            .map_err(|e| QckerError::internal(format!("Failed to remove image: {}", e)))?;
 
         Ok(())
     }

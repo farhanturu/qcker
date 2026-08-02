@@ -35,7 +35,7 @@ impl ExtensionManager {
     pub fn init(&mut self) -> Result<()> {
         let extensions_dir = self.data_dir.join("extensions");
         fs::create_dir_all(&extensions_dir)
-            .map_err(|e| QckerError::Internal(format!("Failed to create extensions dir: {}", e)))?;
+            .map_err(|e| QckerError::internal(format!("Failed to create extensions dir: {}", e)))?;
 
         self.scan_extensions()?;
 
@@ -50,17 +50,17 @@ impl ExtensionManager {
         }
 
         for entry in fs::read_dir(&extensions_dir)
-            .map_err(|e| QckerError::Internal(format!("Failed to read extensions dir: {}", e)))?
+            .map_err(|e| QckerError::internal(format!("Failed to read extensions dir: {}", e)))?
         {
             let entry = entry
-                .map_err(|e| QckerError::Internal(format!("Failed to read entry: {}", e)))?;
+                .map_err(|e| QckerError::internal(format!("Failed to read entry: {}", e)))?;
             let manifest_path = entry.path().join("manifest.json");
 
             if manifest_path.exists() {
                 let content = fs::read_to_string(&manifest_path)
-                    .map_err(|e| QckerError::Internal(format!("Failed to read manifest: {}", e)))?;
+                    .map_err(|e| QckerError::internal(format!("Failed to read manifest: {}", e)))?;
                 let manifest: ExtensionManifest = serde_json::from_str(&content)
-                    .map_err(|e| QckerError::Internal(format!("Failed to parse manifest: {}", e)))?;
+                    .map_err(|e| QckerError::internal(format!("Failed to parse manifest: {}", e)))?;
 
                 let info = ExtensionInfo {
                     metadata: manifest.extension,
@@ -87,7 +87,7 @@ impl ExtensionManager {
         let source = std::path::Path::new(source_path);
 
         if !source.exists() {
-            return Err(QckerError::InvalidArgument(format!(
+            return Err(QckerError::invalid_argument(format!(
                 "Extension path not found: {}",
                 source_path
             )));
@@ -95,20 +95,20 @@ impl ExtensionManager {
 
         let manifest_path = source.join("manifest.json");
         if !manifest_path.exists() {
-            return Err(QckerError::InvalidArgument(
+            return Err(QckerError::invalid_argument(
                 "Extension must contain manifest.json".to_string(),
             ));
         }
 
         let content = fs::read_to_string(&manifest_path)
-            .map_err(|e| QckerError::Internal(format!("Failed to read manifest: {}", e)))?;
+            .map_err(|e| QckerError::internal(format!("Failed to read manifest: {}", e)))?;
         let manifest: ExtensionManifest = serde_json::from_str(&content)
-            .map_err(|e| QckerError::Internal(format!("Failed to parse manifest: {}", e)))?;
+            .map_err(|e| QckerError::internal(format!("Failed to parse manifest: {}", e)))?;
 
         let ext_id = manifest.extension.id.clone();
 
         if self.extensions.contains_key(&ext_id) {
-            return Err(QckerError::InvalidArgument(format!(
+            return Err(QckerError::invalid_argument(format!(
                 "Extension already installed: {}",
                 ext_id
             )));
@@ -116,16 +116,16 @@ impl ExtensionManager {
 
         let dest_dir = self.data_dir.join("extensions").join(&ext_id);
         fs::create_dir_all(&dest_dir)
-            .map_err(|e| QckerError::Internal(format!("Failed to create extension dir: {}", e)))?;
+            .map_err(|e| QckerError::internal(format!("Failed to create extension dir: {}", e)))?;
 
         fs::copy(&manifest_path, dest_dir.join("manifest.json"))
-            .map_err(|e| QckerError::Internal(format!("Failed to copy manifest: {}", e)))?;
+            .map_err(|e| QckerError::internal(format!("Failed to copy manifest: {}", e)))?;
 
         for ext in &[".so", ".dylib", ".dll"] {
             let lib_path = source.join(format!("libext{}", ext));
             if lib_path.exists() {
                 fs::copy(&lib_path, dest_dir.join(format!("libext{}", ext)))
-                    .map_err(|e| QckerError::Internal(format!("Failed to copy library: {}", e)))?;
+                    .map_err(|e| QckerError::internal(format!("Failed to copy library: {}", e)))?;
             }
         }
 
@@ -144,7 +144,7 @@ impl ExtensionManager {
 
     pub fn uninstall(&mut self, id: &str) -> Result<()> {
         if !self.extensions.contains_key(id) {
-            return Err(QckerError::InvalidArgument(format!(
+            return Err(QckerError::invalid_argument(format!(
                 "Extension not found: {}",
                 id
             )));
@@ -153,7 +153,7 @@ impl ExtensionManager {
         let ext_dir = self.data_dir.join("extensions").join(id);
         if ext_dir.exists() {
             fs::remove_dir_all(&ext_dir)
-                .map_err(|e| QckerError::Internal(format!("Failed to remove extension: {}", e)))?;
+                .map_err(|e| QckerError::internal(format!("Failed to remove extension: {}", e)))?;
         }
 
         self.extensions.remove(id);
@@ -169,7 +169,7 @@ impl ExtensionManager {
             tracing::info!("Extension {} enabled", id);
             Ok(())
         } else {
-            Err(QckerError::InvalidArgument(format!(
+            Err(QckerError::invalid_argument(format!(
                 "Extension not found: {}",
                 id
             )))
@@ -182,7 +182,7 @@ impl ExtensionManager {
             tracing::info!("Extension {} disabled", id);
             Ok(())
         } else {
-            Err(QckerError::InvalidArgument(format!(
+            Err(QckerError::invalid_argument(format!(
                 "Extension not found: {}",
                 id
             )))

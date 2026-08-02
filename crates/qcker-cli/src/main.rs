@@ -21,7 +21,7 @@ use tui::handler::{handle_key_event, handle_mouse_event};
 use tui::ui::draw;
 
 #[derive(Parser)]
-#[command(name = "qcker", version, about = "Qcker - A daemonless, rootless container engine")]
+#[command(name = "qcker", version, about = "Qcker v1.1 - A daemonless, rootless container engine")]
 struct Cli {
     #[command(subcommand)]
     command: Option<Commands>,
@@ -135,7 +135,7 @@ fn run_tui(data_dir: PathBuf) -> anyhow::Result<()> {
             }
             AppEvent::Tick => {
                 tick_count += 1;
-                if app.auto_refresh && tick_count % 8 == 0 {
+                if app.auto_refresh && tick_count.is_multiple_of(8) {
                     app.refresh();
                 }
             }

@@ -1,3 +1,5 @@
+#![allow(clippy::result_large_err)]
+
 pub mod capability;
 pub mod cgroup;
 pub mod hooks;

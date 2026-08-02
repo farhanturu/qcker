@@ -27,14 +27,14 @@ impl KernelManager {
             return Ok(path);
         }
 
-        Err(QckerError::Internal(
+        Err(QckerError::internal(
             "Kernel not found. Download from https://github.com/farhanturu/qcker/releases".to_string()
         ))
     }
 
     pub fn verify_checksum(&self, path: &Path, expected: &str) -> Result<bool> {
         let data = std::fs::read(path)
-            .map_err(|e| QckerError::Internal(format!("Failed to read kernel: {}", e)))?;
+            .map_err(|e| QckerError::internal(format!("Failed to read kernel: {}", e)))?;
 
         let mut hasher = Sha256::new();
         hasher.update(&data);

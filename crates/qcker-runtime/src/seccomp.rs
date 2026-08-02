@@ -60,14 +60,14 @@ pub enum SeccompAction {
 }
 
 impl SeccompAction {
-    pub fn from_str(s: &str) -> Result<Self> {
+    pub fn parse_action(s: &str) -> Result<Self> {
         match s {
             "SCMP_ACT_ALLOW" => Ok(SeccompAction::Allow),
             "SCMP_ACT_ERRNO" => Ok(SeccompAction::Errno),
             "SCMP_ACT_KILL" => Ok(SeccompAction::Kill),
             "SCMP_ACT_TRACE" => Ok(SeccompAction::Trace),
             "SCMP_ACT_LOG" => Ok(SeccompAction::Log),
-            _ => Err(QckerError::Seccomp(format!("Unknown action: {}", s))),
+            _ => Err(QckerError::seccomp(format!("Unknown action: {}", s))),
         }
     }
 }
@@ -183,7 +183,7 @@ fn install_filter(filter: &[libc::sock_filter]) -> Result<()> {
             &mut fprog as *mut libc::sock_fprog,
         );
         if ret != 0 {
-            return Err(QckerError::Seccomp(format!(
+            return Err(QckerError::seccomp(format!(
                 "Failed to install seccomp filter: {}",
                 std::io::Error::last_os_error()
             )));
@@ -197,7 +197,7 @@ pub fn apply_default_profile() -> Result<()> {
     unsafe {
         let ret = libc::prctl(libc::PR_SET_NO_NEW_PRIVS, 1, 0, 0, 0);
         if ret != 0 {
-            return Err(QckerError::Seccomp(format!(
+            return Err(QckerError::seccomp(format!(
                 "Failed to set NO_NEW_PRIVS: {}",
                 std::io::Error::last_os_error()
             )));
@@ -250,7 +250,7 @@ pub fn apply_profile(profile: &SeccompProfile) -> Result<()> {
     unsafe {
         let ret = libc::prctl(libc::PR_SET_NO_NEW_PRIVS, 1, 0, 0, 0);
         if ret != 0 {
-            return Err(QckerError::Seccomp(format!(
+            return Err(QckerError::seccomp(format!(
                 "Failed to set NO_NEW_PRIVS: {}",
                 std::io::Error::last_os_error()
             )));
@@ -349,13 +349,13 @@ pub fn apply_profile(profile: &SeccompProfile) -> Result<()> {
 
 pub fn load_profile_from_json(json: &str) -> Result<SeccompProfile> {
     let value: serde_json::Value = serde_json::from_str(json)
-        .map_err(|e| QckerError::Seccomp(format!("Failed to parse seccomp profile: {}", e)))?;
+        .map_err(|e| QckerError::seccomp(format!("Failed to parse seccomp profile: {}", e)))?;
 
     let default_action_str = value["defaultAction"]
         .as_str()
-        .ok_or_else(|| QckerError::Seccomp("Missing defaultAction".to_string()))?;
+        .ok_or_else(|| QckerError::seccomp("Missing defaultAction".to_string()))?;
 
-    let default_action = SeccompAction::from_str(default_action_str)?;
+    let default_action = SeccompAction::parse_action(default_action_str)?;
 
     let mut syscalls = Vec::new();
     if let Some(syscalls_array) = value["syscalls"].as_array() {
@@ -373,7 +373,7 @@ pub fn load_profile_from_json(json: &str) -> Result<SeccompProfile> {
                 .as_str()
                 .unwrap_or("SCMP_ACT_ERRNO");
 
-            let action = SeccompAction::from_str(action_str)?;
+            let action = SeccompAction::parse_action(action_str)?;
 
             syscalls.push(SeccompSyscallRule { names, action });
         }
@@ -440,14 +440,14 @@ mod tests {
     #[test]
     fn test_seccomp_action_from_str() {
         assert!(matches!(
-            SeccompAction::from_str("SCMP_ACT_ALLOW").unwrap(),
+            SeccompAction::parse_action("SCMP_ACT_ALLOW").unwrap(),
             SeccompAction::Allow
         ));
         assert!(matches!(
-            SeccompAction::from_str("SCMP_ACT_ERRNO").unwrap(),
+            SeccompAction::parse_action("SCMP_ACT_ERRNO").unwrap(),
             SeccompAction::Errno
         ));
-        assert!(SeccompAction::from_str("INVALID").is_err());
+        assert!(SeccompAction::parse_action("INVALID").is_err());
     }
 
     #[test]

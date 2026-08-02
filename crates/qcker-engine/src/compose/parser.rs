@@ -89,12 +89,12 @@ pub struct VolumeConfig {
 impl ComposeFile {
     pub fn parse(content: &str) -> Result<Self> {
         serde_yaml::from_str(content)
-            .map_err(|e| QckerError::InvalidArgument(format!("Failed to parse compose file: {}", e)))
+            .map_err(|e| QckerError::invalid_argument(format!("Failed to parse compose file: {}", e)))
     }
 
     pub fn parse_file(path: &Path) -> Result<Self> {
         let content = std::fs::read_to_string(path)
-            .map_err(|e| QckerError::Internal(format!("Failed to read compose file: {}", e)))?;
+            .map_err(|e| QckerError::internal(format!("Failed to read compose file: {}", e)))?;
         Self::parse(&content)
     }
 
@@ -120,7 +120,7 @@ impl ComposeFile {
         visiting: &mut std::collections::HashSet<String>,
     ) -> Result<()> {
         if visiting.contains(name) {
-            return Err(QckerError::InvalidArgument(format!(
+            return Err(QckerError::invalid_argument(format!(
                 "Circular dependency detected: {}",
                 name
             )));

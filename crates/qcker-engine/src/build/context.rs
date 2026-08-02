@@ -23,7 +23,7 @@ impl BuildContext {
         }
 
         let content = fs::read_to_string(&ignore_path)
-            .map_err(|e| QckerError::Internal(format!("Failed to read .dockerignore: {}", e)))?;
+            .map_err(|e| QckerError::internal(format!("Failed to read .dockerignore: {}", e)))?;
 
         let patterns: Vec<String> = content
             .lines()
@@ -51,13 +51,11 @@ impl BuildContext {
             return true;
         }
 
-        if pattern.starts_with("**/") {
-            let suffix = &pattern[3..];
+        if let Some(suffix) = pattern.strip_prefix("**/") {
             return path.ends_with(suffix) || path.contains(suffix);
         }
 
-        if pattern.ends_with("/*") {
-            let prefix = &pattern[..pattern.len() - 2];
+        if let Some(prefix) = pattern.strip_suffix("/*") {
             return path.starts_with(prefix);
         }
 
@@ -82,10 +80,10 @@ impl BuildContext {
 
     fn hash_directory(&self, dir: &Path, hasher: &mut sha2::Sha256) -> Result<()> {
         for entry in fs::read_dir(dir)
-            .map_err(|e| QckerError::Internal(format!("Failed to read directory: {}", e)))?
+            .map_err(|e| QckerError::internal(format!("Failed to read directory: {}", e)))?
         {
             let entry = entry
-                .map_err(|e| QckerError::Internal(format!("Failed to read entry: {}", e)))?;
+                .map_err(|e| QckerError::internal(format!("Failed to read entry: {}", e)))?;
             let path = entry.path();
 
             if self.should_ignore(&path) {
@@ -99,7 +97,7 @@ impl BuildContext {
                 self.hash_directory(&path, hasher)?;
             } else {
                 let content = fs::read(&path)
-                    .map_err(|e| QckerError::Internal(format!("Failed to read file: {}", e)))?;
+                    .map_err(|e| QckerError::internal(format!("Failed to read file: {}", e)))?;
                 hasher.update(&content);
             }
         }
@@ -115,10 +113,10 @@ impl BuildContext {
 
     fn list_directory(&self, dir: &Path, files: &mut Vec<PathBuf>) -> Result<()> {
         for entry in fs::read_dir(dir)
-            .map_err(|e| QckerError::Internal(format!("Failed to read directory: {}", e)))?
+            .map_err(|e| QckerError::internal(format!("Failed to read directory: {}", e)))?
         {
             let entry = entry
-                .map_err(|e| QckerError::Internal(format!("Failed to read entry: {}", e)))?;
+                .map_err(|e| QckerError::internal(format!("Failed to read entry: {}", e)))?;
             let path = entry.path();
 
             if self.should_ignore(&path) {

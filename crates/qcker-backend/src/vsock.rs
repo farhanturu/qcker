@@ -1,5 +1,4 @@
 use serde::{Deserialize, Serialize};
-use std::io::Read;
 use std::os::unix::io::RawFd;
 
 use super::protocol::{deserialize_message, serialize_message, MAX_MESSAGE_SIZE};
@@ -63,7 +62,7 @@ impl SyncVsockChannel {
             return Err(RecvTimeoutError::Timeout);
         }
 
-        self.recv().map_err(|e| RecvTimeoutError::Io(std::io::Error::new(std::io::ErrorKind::Other, e)))
+        self.recv().map_err(|e| RecvTimeoutError::Io(std::io::Error::other(e)))
     }
 
     fn read_exact(&self, buf: &mut [u8]) -> Result<(), String> {

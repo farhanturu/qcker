@@ -117,9 +117,9 @@ pub fn execute(args: RunArgs, data_dir: &Path, format: &str) -> anyhow::Result<(
         args.dns.clone()
     };
 
-    let port_mappings: Vec<String> = args.publish.iter().map(|p| p.clone()).collect();
+    let port_mappings: Vec<String> = args.publish.to_vec();
 
-    let volume_mounts: Vec<String> = args.volume.iter().map(|v| v.clone()).collect();
+    let volume_mounts: Vec<String> = args.volume.to_vec();
 
     let hostname = args.hostname.unwrap_or_else(|| container_id[..12.min(container_id.len())].to_string());
 

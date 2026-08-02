@@ -8,7 +8,7 @@ use std::sync::{Arc, Mutex};
 use qcker_runtime::cgroup;
 use qcker_runtime::process::ContainerProcess;
 use qcker_runtime::spec::{
-    ContainerState, LinuxConfig, NamespaceConfig, NamespaceType, OciConfig, ProcessConfig,
+    LinuxConfig, NamespaceConfig, NamespaceType, OciConfig, ProcessConfig,
     RootConfig, UserConfig,
 };
 
@@ -91,7 +91,7 @@ impl NativeBackend {
         let spec: Option<ContainerSpec> = spec_content
             .and_then(|c| serde_json::from_str(&c).ok());
 
-        let rootfs_path = container.rootfs_path.clone().unwrap_or_else(|| {
+        let _rootfs_path = container.rootfs_path.clone().unwrap_or_else(|| {
             self.container_dir(&container.id)
                 .join("rootfs")
                 .to_str()
@@ -253,7 +253,7 @@ impl RuntimeBackend for NativeBackend {
         let log_path = self.container_log_path(id);
         let data_dir = self.data_dir.clone();
         let id_owned = id.to_string();
-        let containers_dir = self.containers_dir.clone();
+        let _containers_dir = self.containers_dir.clone();
         let running_pids = self.running_pids.clone();
 
         let result = tokio::task::spawn_blocking(move || {
@@ -278,8 +278,7 @@ impl RuntimeBackend for NativeBackend {
             Ok::<(u32, String), String>((pid, id_owned))
         })
         .await
-        .map_err(|e| format!("Spawn blocking task failed: {}", e))?
-        .map_err(|e| e)?;
+        .map_err(|e| format!("Spawn blocking task failed: {}", e))??;
 
         container.pid = Some(result.0);
         container.status = ContainerStatus::Running;

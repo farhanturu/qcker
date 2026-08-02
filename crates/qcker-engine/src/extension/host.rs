@@ -59,7 +59,7 @@ impl ExtensionHost {
 
     pub fn send_request(&self, extension_id: &str, request: IpcRequest) -> Result<IpcResponse> {
         if !self.active_extensions.contains_key(extension_id) {
-            return Err(QckerError::InvalidArgument(format!(
+            return Err(QckerError::invalid_argument(format!(
                 "Extension not active: {}",
                 extension_id
             )));

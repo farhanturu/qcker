@@ -39,10 +39,10 @@ pub fn execute_hook(hook: &Hook, container: &Container) -> Result<()> {
 
     let output = cmd
         .output()
-        .map_err(|e| QckerError::Process(format!("Failed to execute hook: {}", e)))?;
+        .map_err(|e| QckerError::process(format!("Failed to execute hook: {}", e)))?;
 
     if !output.status.success() {
-        return Err(QckerError::Process(format!(
+        return Err(QckerError::process(format!(
             "Hook failed with exit code: {}",
             output.status.code().unwrap_or(-1)
         )));
