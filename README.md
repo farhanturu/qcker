@@ -29,7 +29,10 @@
 
 ## What's New in v1.1
 
-- **Dracula Theme System**: Centralized `theme.rs` with full Dracula color palette, status colors, gauge colors, and semantic naming
+- **Real MicroVM Backend**: Full implementation with vsock host-guest communication, container lifecycle management (create/start/kill/delete), exec support, file operations via vsock, and automatic VM startup
+- **vsock Protocol**: Length-prefixed JSON protocol over vsock for zero-overhead host-guest communication with ping/pong health checks and timeout handling
+- **Enhanced VmmManager**: QEMU process management with serial console logging, KVM detection, version query, and graceful shutdown
+- **Dracula Theme System**: Centralized `theme.rs` with full Dracula color palette, status colors, gauge colors, semantic style helpers, and 20+ pre-built style functions
 - **Zero Compiler Warnings**: All Rust snake_case, dead_code, unused_import, and clippy warnings resolved across the entire workspace
 - **Improved Error Handling**: All error constructors now follow Rust naming conventions (`snake_case`)
 - **TUI Refinements**: Status bar uses darker background for visual separation, marketplace uses semantic status colors
@@ -188,15 +191,30 @@ Backend selection is automatic based on platform.
 
 ## MicroVM Support
 
-Qcker includes a MicroVM backend for running containers on macOS and Windows without a full Docker Desktop installation.
+Qcker includes a **real MicroVM backend** for running containers on macOS and Windows without a full Docker Desktop installation.
 
 **How it works:**
 - On Linux: Uses native namespaces and cgroups (no VM needed)
-- On macOS/Windows: Spawns a minimal MicroVM via QEMU
-- The MicroVM runs qcker-runtime as PID 1 (init process)
-- Communication via vsock (zero-overhead kernel channel)
-- Single VM shared by all containers (not per-container)
-- Auto-shutdown after idle timeout
+- On macOS/Windows: Spawns a minimal MicroVM via QEMU (`qemu-system-x86_64 -machine microvm`)
+- The MicroVM runs a guest agent that listens on vsock port 7421
+- Host sends commands via vsock (length-prefixed JSON protocol)
+- Container lifecycle: create → start → kill → delete (all via vsock)
+- File operations: read/write/list/delete via exec through vsock
+- Stats collection: CPU, memory, network, PIDs from guest agent
+- Port forwarding: host ports mapped to guest VM ports
+- Lazy VM startup: VM starts on first container creation
+- Auto-shutdown on backend shutdown with graceful guest agent notification
+
+**Protocol:**
+```
+Host → VM (HostToVm):
+  ping | container.create | container.start | container.kill
+  container.delete | container.exec | container.stats | vm.shutdown
+
+VM → Host (VmToHost):
+  vm.ready | pong | container.created | container.started
+  container.exited | container.stats | container.log | error
+```
 
 ---
 
