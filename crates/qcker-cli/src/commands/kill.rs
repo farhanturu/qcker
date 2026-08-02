@@ -4,6 +4,7 @@ use std::path::Path;
 
 use crate::output;
 use qcker_runtime::process::ContainerProcess;
+use qcker_runtime::spec::ContainerState;
 
 #[derive(Args)]
 pub struct KillArgs {
@@ -14,9 +15,9 @@ pub struct KillArgs {
 }
 
 pub fn execute(args: KillArgs, data_dir: &Path, _format: &str) -> anyhow::Result<()> {
-    let container = ContainerProcess::load_state(data_dir, &args.container_id)?;
+    let mut container = ContainerProcess::load_state(data_dir, &args.container_id)?;
     let process = ContainerProcess {
-        container,
+        container: container.clone(),
         data_dir: data_dir.to_path_buf(),
     };
 
@@ -31,6 +32,11 @@ pub fn execute(args: KillArgs, data_dir: &Path, _format: &str) -> anyhow::Result
     };
 
     process.kill(signal)?;
+
+    container.state = ContainerState::Stopped;
+    let state_path = data_dir.join("containers").join(&args.container_id).join("state.json");
+    let json = serde_json::to_string_pretty(&container)?;
+    std::fs::write(&state_path, json)?;
 
     output::print_success(&format!(
         "Container {} killed with {}",

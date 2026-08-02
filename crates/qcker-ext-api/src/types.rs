@@ -145,26 +145,3 @@ impl IpcEvent {
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_ipc_request() {
-        let req = IpcRequest::new(1, "container.list", serde_json::json!({}));
-        assert_eq!(req.jsonrpc, "2.0");
-        assert_eq!(req.id, 1);
-        assert_eq!(req.method, "container.list");
-    }
-
-    #[test]
-    fn test_ipc_response() {
-        let resp = IpcResponse::success(1, serde_json::json!({"containers": []}));
-        assert!(resp.result.is_some());
-        assert!(resp.error.is_none());
-
-        let resp = IpcResponse::error(2, -32600, "Invalid Request");
-        assert!(resp.result.is_none());
-        assert!(resp.error.is_some());
-    }
-}

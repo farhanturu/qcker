@@ -1,13 +1,15 @@
+use qcker_common::error::{QckerError, Result};
+
 use crate::microvm::MicroVmBackend;
 use crate::native::NativeBackend;
 use crate::RuntimeBackend;
 
-pub fn select_backend(override_backend: Option<&str>) -> Result<Box<dyn RuntimeBackend>, String> {
+pub fn select_backend(override_backend: Option<&str>) -> Result<Box<dyn RuntimeBackend>> {
     if let Some(name) = override_backend {
         return match name {
             "native" => Ok(Box::new(NativeBackend::new())),
             "microvm" => Ok(Box::new(MicroVmBackend::new())),
-            _ => Err(format!("Unknown backend: {}", name)),
+            _ => Err(QckerError::internal(format!("Unknown backend: {}", name))),
         };
     }
 
@@ -32,5 +34,5 @@ pub fn select_backend(override_backend: Option<&str>) -> Result<Box<dyn RuntimeB
         return Ok(Box::new(microvm));
     }
 
-    Err("No runtime backend available".to_string())
+    Err(QckerError::internal("No runtime backend available".to_string()))
 }

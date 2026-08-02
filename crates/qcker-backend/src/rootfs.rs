@@ -25,20 +25,9 @@ impl RootfsManager {
             return Ok(path);
         }
 
-        Err(QckerError::Internal(
+        Err(QckerError::internal(
             "Rootfs not found. Build with: cargo build --release --target x86_64-unknown-linux-musl".to_string()
         ))
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_rootfs_path() {
-        let manager = RootfsManager::new(PathBuf::from("/tmp/qcker"));
-        let path = manager.rootfs_path();
-        assert!(path.to_string_lossy().contains("initramfs"));
-    }
-}

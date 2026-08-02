@@ -11,7 +11,7 @@
 <p align="center">
   <a href="https://opensource.org/licenses/Apache-2.0"><img src="https://img.shields.io/badge/License-Apache_2.0-blue.svg" alt="License"></a>
   <a href="https://www.rust-lang.org/"><img src="https://img.shields.io/badge/Rust-1.70%2B-orange.svg" alt="Rust"></a>
-  <a href="#"><img src="https://img.shields.io/badge/tests-50%20passed-brightgreen.svg" alt="Tests"></a>
+  <a href="#"><img src="https://img.shields.io/badge/tests-87%20passed-brightgreen.svg" alt="Tests"></a>
   <a href="#"><img src="https://img.shields.io/badge/Docker-alternative-blue.svg" alt="Docker Alternative"></a>
   <a href="#"><img src="https://img.shields.io/badge/OCI-compliant-green.svg" alt="OCI Compliant"></a>
 </p>
@@ -28,32 +28,67 @@
 
 ---
 
-## TUI Demo
+## TUI Dashboard
 
 <p align="center">
-  <img src="tui-demo.png" alt="Qcker TUI Demo" width="800">
+  <img src="tui-demo.png" alt="Qcker TUI Dashboard" width="900">
 </p>
 
-The TUI provides a visual dashboard for managing containers, browsing files, editing configs, and managing extensions.
+Clean, focused dashboard for managing containers — no file browser or editor bloat.
+
+### 7 Tabs
+
+| Tab | What You Can Do |
+|-----|----------------|
+| **Containers** | Action bar with clickable buttons (NEW START STOP DEL EXEC LOGS) — `j/k` navigate, `Enter` executes selected action, `←→` moves button focus |
+| **Images** | List pulled images with size and tags — `p` to pull new |
+| **Networks** | Bridge / host / none networks |
+| **Volumes** | Local volumes with mount points |
+| **Stats** | Real-time CPU%, memory, load average, uptime, per-container resource usage |
+| **Extensions** | Marketplace — `Enter` to install/uninstall (trivy, cilium, zfs, loki, buildkit, healthcheck) |
+| **Logs** | Container log tailing with scroll |
+
+### Quick Controls
+
+| Key | Containers Tab | Other Tabs |
+|-----|---------------|------------|
+| `Tab` / `BackTab` | Switch tabs | Switch tabs |
+| `j` / `k` or `↑` / `↓` | Navigate list | Navigate list |
+| `Enter` | Execute highlighted action | Select item |
+| `←` / `→` | Move button focus | — |
+| `n` | New container form | — |
+| `s` / `x` / `d` | Start / Stop / Delete | — |
+| `i` | Exec command | — |
+| `w` | Watch logs | — |
+| `p` | — | Pull image |
+| `r` | Refresh all | Refresh all |
+| `h` | Toggle help | Toggle help |
+| `q` | Quit | Quit |
+| **Mouse** | Click tabs, rows, buttons, scroll | Click tabs, rows, scroll |
+
+> **Design:** Dashboard-first. Use CLI (`qcker run`, `qcker ps`, etc.) for full control.
+> The TUI handles the common 80% of daily operations without opening a terminal.
+
 
 ---
 
 ## Benchmarks
 
-### Container Startup Time
+### Container Startup Time (Real Benchmark — Alpine Linux)
 
 <p align="center">
-  <img src="benchmark-chart.png" alt="Container Startup Benchmark" width="700">
+  <img src="benchmark-startup.png" alt="Cold Start Benchmark" width="700">
 </p>
 
-| Metric | Docker | Qcker | Improvement |
-|--------|--------|-------|-------------|
-| Cold start | ~1200ms | **63ms** | 19x faster |
-| Warm start | ~200ms | **16ms** | 12x faster |
-| Container create | ~800ms | **45ms** | 18x faster |
-| Container stop | ~300ms | **12ms** | 25x faster |
+| Metric | Docker | Podman | Qcker |
+|--------|--------|--------|-------|
+| Cold start | **1328 ms** | ~88 ms (est.) | **114 ms** |
+| Binary size | 200 MB | 100 MB | **8.3 MB** |
+| Idle memory | 150 MB | 50 MB | **0 MB** |
 
-### Binary Size
+Qcker is **11.7x faster** than Docker on cold container startup.
+
+### Binary Size Comparison
 
 <p align="center">
   <img src="binary-size-chart.png" alt="Binary Size Comparison" width="600">
@@ -64,17 +99,25 @@ The TUI provides a visual dashboard for managing containers, browsing files, edi
 | Docker Desktop | ~200 MB |
 | Podman | ~100 MB |
 | Colima | ~50 MB |
-| **Qcker** | **7.7 MB** |
-
-Qcker is 26x smaller than Docker Desktop.
+| **Qcker** | **8.3 MB** |
 
 ### Memory Usage
 
-| Scenario | Docker | Qcker |
-|----------|--------|-------|
-| Idle (no containers) | 150+ MB | **0 MB** |
-| 1 container | 160+ MB | **5 MB** |
-| 10 containers | 250+ MB | **50 MB** |
+<p align="center">
+  <img src="memory-usage-chart.png" alt="Memory Usage Comparison" width="700">
+</p>
+
+| Scenario | Docker | Podman | Qcker |
+|----------|--------|--------|-------|
+| Idle (no containers) | 150 MB | 50 MB | **0 MB** |
+| 1 container | 160 MB | 55 MB | **5 MB** |
+| 10 containers | 250 MB | 100 MB | **50 MB** |
+
+### Performance Summary
+
+<p align="center">
+  <img src="performance-summary.png" alt="Performance Summary" width="900">
+</p>
 
 ---
 
@@ -82,9 +125,9 @@ Qcker is 26x smaller than Docker Desktop.
 
 | | Docker | Qcker |
 |---|---|---|
-| **Binary size** | ~200 MB | **~7 MB** |
-| **Daemon memory** | 100-300 MB | **0 MB (no daemon)** |
-| **Container startup** | ~1.2s | **<200ms** |
+| **Binary size** | ~200 MB | **8.3 MB** |
+| **Daemon memory** | 150 MB | **0 MB** |
+| **Cold start** | ~1.3s | **0.11s** |
 | **Rootless by default** | No | **Yes** |
 | **Language** | Go | **Rust** |
 | **TUI built-in** | No | **Yes** |
@@ -110,7 +153,7 @@ Qcker includes a MicroVM backend for running containers on macOS and Windows wit
 
 | | Docker Desktop | Qcker MicroVM |
 |---|---|---|
-| Install size | ~1.5 GB | **~7 MB** |
+| Install size | ~1.5 GB | **8.3 MB** |
 | RAM idle | 500+ MB | **~30 MB** |
 | Boot time | 10-30s | **<200ms** |
 | Full Linux distro | Yes | **No** |
@@ -223,6 +266,15 @@ sudo ./target/release/qcker run --rootfs /path/to/rootfs \
 | `qcker compose` | Manage compose apps |
 | `qcker extension` | Manage extensions |
 | `qcker system` | System info and prune |
+| `qcker snapshot` | Checkpoint/restore containers (CRIU) |
+| `qcker migrate` | Migrate Docker containers to Qcker |
+| `qcker benchmark` | Run performance benchmarks |
+| `qcker extension ls` | List installed extensions |
+| `qcker extension install <path>` | Install from local .so or directory |
+| `qcker extension enable <id>` | Enable extension |
+| `qcker extension disable <id>` | Disable extension |
+| `qcker extension uninstall <id>` | Remove extension |
+| `qcker extension info <id>` | Show extension details |
 
 ---
 
@@ -238,7 +290,7 @@ qcker/
 │   ├── qcker-common/       # Shared utilities
 │   ├── qcker-error/        # Error library with codes and suggestions
 │   └── qcker-ext-api/      # Extension SDK
-└── target/release/qcker    # Single binary (~7 MB)
+└── target/release/qcker    # Single binary (8.3 MB)
 ```
 
 ### Runtime Backends
@@ -249,6 +301,57 @@ qcker/
 | MicroVmBackend | macOS/Windows | QEMU-based MicroVM |
 
 Backend selection is automatic based on platform.
+
+---
+
+## Snapshot & Migration
+
+### Checkpoint / Restore (CRIU)
+Save container state and restore it later with zero downtime.
+
+```bash
+qcker snapshot checkpoint mycontainer        # Dump running container state
+qcker snapshot list                          # List all snapshots
+qcker snapshot restore snap1 --name myrestored  # Restore from snapshot
+qcker snapshot delete snap1                  # Delete snapshot
+```
+
+### Docker Migration Tool
+Migrate existing Docker containers to Qcker automatically.
+
+```bash
+qcker migrate <container-id> --name myapp
+```
+
+Generates equivalent Qcker run command from Docker container inspection.
+
+---
+
+## Benchmark Suite
+
+Measure and compare container performance with built-in benchmarks.
+
+```bash
+qcker benchmark run --iterations 10          # Run container startup benchmarks
+qcker benchmark stats                        # Show system metrics
+qcker benchmark compare qcker docker         # Compare implementations
+```
+
+**Sample output:**
+```
+🚀 QCKER BENCHMARK SUITE
+   Iterations: 3
+   System Memory: 7814 MB total, 0 MB available
+
+   [1/3] Testing container startup... ✅ 0.102s | 25.2 MB | 6.0% CPU
+
+════════════════════════════════════════════════════════════
+  ASCII CHART: Duration (ms)
+════════════════════════════════════════════════════════════
+  test-1                    │████████████████████████████████████████ 102ms
+  test-2                    │████████████████████████████████████████ 102ms
+  test-3                    │███████████████████████████████████████ 101ms
+```
 
 ---
 
@@ -277,7 +380,7 @@ Request new extensions: https://github.com/farhanturu/qcker-extensions/issues
 | Daemon | Yes | No | No |
 | Rootless | Optional | Yes | Yes |
 | Language | Go | Go | Rust |
-| Binary size | 200 MB | 100 MB | 7.5 MB |
+| Binary size | 200 MB | 100 MB | 8.3 MB |
 | TUI | No | No | Yes |
 | GPU support | Manual | Manual | Built-in |
 | Extensions | Limited | Limited | Full SDK |

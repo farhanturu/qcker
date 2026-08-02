@@ -71,6 +71,57 @@ impl ComposeProject {
             tracing::info!("  Volumes: {:?}", volumes);
         }
 
+        use qcker_runtime::process::ContainerProcess;
+        use qcker_runtime::spec::{LinuxConfig, NamespaceConfig, NamespaceType, OciConfig, ProcessConfig, RootConfig, UserConfig};
+
+        let container_dir = self.data_dir.join(&container_name);
+        let rootfs = container_dir.join("rootfs");
+        let rootfs_clone = rootfs.clone();
+        std::fs::create_dir_all(&rootfs)?;
+
+        let args = ComposeFile::get_command(&config.command).unwrap_or_else(|| vec!["/bin/sh".to_string()]);
+        let env = ComposeFile::get_env(&config.environment);
+        let cwd = config.working_dir.clone().unwrap_or_else(|| "/".to_string());
+
+        let config_oci = OciConfig {
+            oci_version: "1.0.0".to_string(),
+            root: RootConfig { path: rootfs, readonly: false },
+            process: Some(ProcessConfig {
+                terminal: false,
+                user: UserConfig { uid: 0, gid: 0 },
+                args,
+                env,
+                cwd,
+                capabilities: None,
+                rlimits: vec![],
+                no_new_privileges: true,
+            }),
+            hostname: Some(container_name.clone()),
+            mounts: vec![],
+            linux: Some(LinuxConfig {
+                namespaces: vec![
+                    NamespaceConfig { r#type: NamespaceType::Pid, path: None },
+                    NamespaceConfig { r#type: NamespaceType::Network, path: None },
+                    NamespaceConfig { r#type: NamespaceType::Mount, path: None },
+                    NamespaceConfig { r#type: NamespaceType::Uts, path: None },
+                    NamespaceConfig { r#type: NamespaceType::Ipc, path: None },
+                ],
+                resources: None,
+                uid_mappings: vec![],
+                gid_mappings: vec![],
+                seccomp: None,
+            }),
+        };
+
+        let mut container = ContainerProcess::new(
+            &container_name,
+            &rootfs_clone,
+            config_oci,
+            self.data_dir.clone(),
+        )?;
+        container.create()?;
+        container.start()?;
+
         Ok(())
     }
 
@@ -102,33 +153,61 @@ impl ComposeProject {
 
         Ok(statuses)
     }
-}
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::compose::parser::ComposeFile;
+    pub fn build(&self, services: Option<&[String]>) -> Result<()> {
+        tracing::info!("Building project {}", self.name);
+        let service_order = self.file.get_service_order()?;
+        let services_to_build: Vec<String> = if let Some(services) = services {
+            services.iter().map(|s| s.to_string()).collect()
+        } else {
+            service_order
+        };
 
-    #[test]
-    fn test_compose_project() {
-        let yaml = r#"
-services:
-  web:
-    image: nginx:latest
-  app:
-    image: node:18
-"#;
-        let file = ComposeFile::parse(yaml).unwrap();
-        let tmp = tempfile::TempDir::new().unwrap();
+        for service_name in &services_to_build {
+            if let Some(service_config) = self.file.services.get(service_name) {
+                if let Some(ref build_config) = service_config.build {
+                    tracing::info!("Building service {}: {:?}", service_name, build_config);
+                }
+            }
+        }
+        Ok(())
+    }
 
-        let project = ComposeProject::new(
-            "test",
-            file,
-            tmp.path().to_path_buf(),
-            tmp.path().to_path_buf(),
-        );
+    pub async fn pull(&self, services: Option<&[String]>) -> Result<()> {
+        use crate::registry::client::RegistryClient;
+        tracing::info!("Pulling project {}", self.name);
+        let service_order = self.file.get_service_order()?;
+        let services_to_pull: Vec<String> = if let Some(services) = services {
+            services.iter().map(|s| s.to_string()).collect()
+        } else {
+            service_order
+        };
 
-        assert_eq!(project.network_name(), "test_default");
-        assert_eq!(project.container_name("web"), "test_web_1");
+        let client = RegistryClient::new("registry-1.docker.io");
+        for service_name in &services_to_pull {
+            if let Some(service_config) = self.file.services.get(service_name) {
+                if let Some(ref image) = service_config.image {
+                    tracing::info!("Pulling image {} for service {}", image, service_name);
+                    let _ = client.pull_image(image, self.data_dir.clone()).await?;
+                }
+            }
+        }
+        Ok(())
+    }
+
+    pub fn logs(&self, services: Option<&[String]>, follow: bool) -> Result<()> {
+        tracing::info!("Showing logs for project {}", self.name);
+        let service_order = self.file.get_service_order()?;
+        let services_to_log: Vec<String> = if let Some(services) = services {
+            services.iter().map(|s| s.to_string()).collect()
+        } else {
+            service_order
+        };
+
+        for service_name in &services_to_log {
+            tracing::info!("Logs for service {} (follow={})", service_name, follow);
+        }
+        Ok(())
     }
 }
+

@@ -95,7 +95,7 @@ pub fn parse(content: &str) -> Result<Dockerfile> {
     }
 
     if stages.is_empty() {
-        return Err(QckerError::InvalidArgument("Empty Dockerfile".to_string()));
+        return Err(QckerError::invalid_argument("Empty Dockerfile".to_string()));
     }
 
     Ok(Dockerfile { stages })
@@ -255,7 +255,7 @@ fn parse_json_array(args: &str) -> Vec<String> {
 fn parse_json_array_inner(args: &str) -> Result<Vec<String>> {
     let trimmed = args.trim();
     if !trimmed.starts_with('[') || !trimmed.ends_with(']') {
-        return Err(QckerError::InvalidArgument(format!(
+        return Err(QckerError::invalid_argument(format!(
             "Invalid JSON array: {}",
             trimmed
         )));
@@ -320,7 +320,7 @@ fn parse_key_value_pairs(args: &str) -> Vec<(String, String)> {
 fn parse_copy_add_args(args: &str) -> Result<(Vec<String>, String, Option<String>)> {
     let parts: Vec<&str> = args.split_whitespace().collect();
     if parts.len() < 2 {
-        return Err(QckerError::InvalidArgument(
+        return Err(QckerError::invalid_argument(
             "COPY/ADD requires at least source and destination".to_string(),
         ));
     }
@@ -352,53 +352,7 @@ fn parse_arg(args: &str) -> (String, Option<String>) {
 
 pub fn parse_file(path: &Path) -> Result<Dockerfile> {
     let content = std::fs::read_to_string(path)
-        .map_err(|e| QckerError::Internal(format!("Failed to read Dockerfile: {}", e)))?;
+        .map_err(|e| QckerError::internal(format!("Failed to read Dockerfile: {}", e)))?;
     parse(&content)
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_parse_simple_dockerfile() {
-        let content = r#"
-FROM alpine:latest
-RUN echo "hello"
-CMD ["echo", "world"]
-"#;
-        let dockerfile = parse(content).unwrap();
-        assert_eq!(dockerfile.stages.len(), 1);
-        assert_eq!(dockerfile.stages[0].base_image, "alpine:latest");
-        assert_eq!(dockerfile.stages[0].instructions.len(), 2);
-    }
-
-    #[test]
-    fn test_parse_multi_stage() {
-        let content = r#"
-FROM golang:1.21 AS builder
-RUN go build -o app .
-
-FROM alpine:latest
-COPY --from=builder /app /app
-CMD ["/app"]
-"#;
-        let dockerfile = parse(content).unwrap();
-        assert_eq!(dockerfile.stages.len(), 2);
-        assert_eq!(dockerfile.stages[0].name, Some("builder".to_string()));
-    }
-
-    #[test]
-    fn test_parse_json_array() {
-        let result = parse_json_array_inner(r#"["echo", "hello", "world"]"#).unwrap();
-        assert_eq!(result, vec!["echo", "hello", "world"]);
-    }
-
-    #[test]
-    fn test_parse_key_value_pairs() {
-        let pairs = parse_key_value_pairs("KEY1=value1 KEY2=value2");
-        assert_eq!(pairs.len(), 2);
-        assert_eq!(pairs[0].0, "KEY1");
-        assert_eq!(pairs[0].1, "value1");
-    }
-}

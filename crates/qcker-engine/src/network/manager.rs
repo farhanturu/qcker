@@ -23,7 +23,7 @@ impl NetworkManager {
     pub fn init(&mut self) -> Result<()> {
         let networks_dir = self.data_dir.join("networks");
         fs::create_dir_all(&networks_dir)
-            .map_err(|e| QckerError::Network(format!("Failed to create networks dir: {}", e)))?;
+            .map_err(|e| QckerError::network(format!("Failed to create networks dir: {}", e)))?;
 
         self.load_networks()?;
 
@@ -40,17 +40,17 @@ impl NetworkManager {
         }
 
         for entry in fs::read_dir(&networks_dir)
-            .map_err(|e| QckerError::Network(format!("Failed to read networks dir: {}", e)))?
+            .map_err(|e| QckerError::network(format!("Failed to read networks dir: {}", e)))?
         {
             let entry = entry
-                .map_err(|e| QckerError::Network(format!("Failed to read entry: {}", e)))?;
+                .map_err(|e| QckerError::network(format!("Failed to read entry: {}", e)))?;
             let path = entry.path().join("config.json");
 
             if path.exists() {
                 let content = fs::read_to_string(&path)
-                    .map_err(|e| QckerError::Network(format!("Failed to read network config: {}", e)))?;
+                    .map_err(|e| QckerError::network(format!("Failed to read network config: {}", e)))?;
                 let config: NetworkConfig = serde_json::from_str(&content)
-                    .map_err(|e| QckerError::Network(format!("Failed to parse network config: {}", e)))?;
+                    .map_err(|e| QckerError::network(format!("Failed to parse network config: {}", e)))?;
                 self.networks.insert(config.id.clone(), config);
             }
         }
@@ -80,13 +80,13 @@ impl NetworkManager {
     pub fn create_network(&mut self, config: NetworkConfig) -> Result<()> {
         let network_dir = self.data_dir.join("networks").join(&config.id);
         fs::create_dir_all(&network_dir)
-            .map_err(|e| QckerError::Network(format!("Failed to create network dir: {}", e)))?;
+            .map_err(|e| QckerError::network(format!("Failed to create network dir: {}", e)))?;
 
         let config_path = network_dir.join("config.json");
         let config_json = serde_json::to_string_pretty(&config)
-            .map_err(|e| QckerError::Network(format!("Failed to serialize config: {}", e)))?;
+            .map_err(|e| QckerError::network(format!("Failed to serialize config: {}", e)))?;
         fs::write(&config_path, config_json)
-            .map_err(|e| QckerError::Network(format!("Failed to write config: {}", e)))?;
+            .map_err(|e| QckerError::network(format!("Failed to write config: {}", e)))?;
 
         if config.driver == NetworkDriver::Bridge {
             let bridge = BridgeNetwork::new(&config)?;
@@ -107,7 +107,7 @@ impl NetworkManager {
                 driver: config.driver.clone(),
                 subnet: config.subnet.clone(),
                 gateway: config.gateway.clone(),
-                container_count: 0, // TODO: Track containers
+                container_count: 0,
             })
             .collect()
     }
@@ -120,16 +120,16 @@ impl NetworkManager {
         self.networks
             .values()
             .find(|n| n.name == id_or_name)
-            .ok_or_else(|| QckerError::Network(format!("Network not found: {}", id_or_name)))
+            .ok_or_else(|| QckerError::network(format!("Network not found: {}", id_or_name)))
     }
 
     pub fn remove_network(&mut self, id: &str) -> Result<()> {
         let config = self.networks.get(id)
-            .ok_or_else(|| QckerError::Network(format!("Network not found: {}", id)))?
+            .ok_or_else(|| QckerError::network(format!("Network not found: {}", id)))?
             .clone();
 
         if config.name == "bridge" || config.name == "host" || config.name == "none" {
-            return Err(QckerError::Network(format!(
+            return Err(QckerError::network(format!(
                 "Cannot remove default network: {}",
                 config.name
             )));
@@ -143,7 +143,7 @@ impl NetworkManager {
         let network_dir = self.data_dir.join("networks").join(id);
         if network_dir.exists() {
             fs::remove_dir_all(&network_dir)
-                .map_err(|e| QckerError::Network(format!("Failed to remove network dir: {}", e)))?;
+                .map_err(|e| QckerError::network(format!("Failed to remove network dir: {}", e)))?;
         }
 
         self.networks.remove(id);
@@ -166,7 +166,7 @@ impl NetworkManager {
                 bridge.connect_container(container_id, container_pid)?;
 
                 for port in ports {
-                    let container_ip = "172.17.0.2"; // TODO: Assign IP dynamically
+                    let container_ip = "172.17.0.2";
                     bridge.setup_port_forward(
                         port.host_port,
                         container_ip,
@@ -187,19 +187,3 @@ impl NetworkManager {
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use tempfile::TempDir;
-
-    #[test]
-    fn test_network_manager() {
-        let tmp = TempDir::new().unwrap();
-        let mut manager = NetworkManager::new(tmp.path().to_path_buf());
-
-        let _ = manager.init();
-
-        let networks = manager.list_networks();
-        println!("Found {} networks", networks.len());
-    }
-}

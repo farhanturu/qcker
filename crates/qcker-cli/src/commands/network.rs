@@ -120,9 +120,10 @@ fn list_networks(data_dir: &Path, format: &str) -> anyhow::Result<()> {
     } else {
         println!("{:<15} {:<15} {:<15} {:<20}", "NETWORK ID", "NAME", "DRIVER", "SUBNET");
         for n in &networks {
+            let id_display = if n.id.len() > 12 { &n.id[..12] } else { &n.id };
             println!(
                 "{:<15} {:<15} {:<15} {:<20}",
-                &n.id[..12],
+                id_display,
                 n.name,
                 format!("{:?}", n.driver).to_lowercase(),
                 n.subnet.as_deref().unwrap_or("-")

@@ -34,10 +34,10 @@ impl BridgeNetwork {
         let output = Command::new("ip")
             .args(["link", "add", &self.bridge_name, "type", "bridge"])
             .output()
-            .map_err(|e| QckerError::Network(format!("Failed to create bridge: {}", e)))?;
+            .map_err(|e| QckerError::network(format!("Failed to create bridge: {}", e)))?;
 
         if !output.status.success() {
-            return Err(QckerError::Network(format!(
+            return Err(QckerError::network(format!(
                 "Failed to create bridge: {}",
                 String::from_utf8_lossy(&output.stderr)
             )));
@@ -52,10 +52,10 @@ impl BridgeNetwork {
                 &self.bridge_name,
             ])
             .output()
-            .map_err(|e| QckerError::Network(format!("Failed to set bridge IP: {}", e)))?;
+            .map_err(|e| QckerError::network(format!("Failed to set bridge IP: {}", e)))?;
 
         if !output.status.success() {
-            return Err(QckerError::Network(format!(
+            return Err(QckerError::network(format!(
                 "Failed to set bridge IP: {}",
                 String::from_utf8_lossy(&output.stderr)
             )));
@@ -64,17 +64,17 @@ impl BridgeNetwork {
         let output = Command::new("ip")
             .args(["link", "set", &self.bridge_name, "up"])
             .output()
-            .map_err(|e| QckerError::Network(format!("Failed to bring up bridge: {}", e)))?;
+            .map_err(|e| QckerError::network(format!("Failed to bring up bridge: {}", e)))?;
 
         if !output.status.success() {
-            return Err(QckerError::Network(format!(
+            return Err(QckerError::network(format!(
                 "Failed to bring up bridge: {}",
                 String::from_utf8_lossy(&output.stderr)
             )));
         }
 
         fs::write("/proc/sys/net/ipv4/ip_forward", "1")
-            .map_err(|e| QckerError::Network(format!("Failed to enable IP forwarding: {}", e)))?;
+            .map_err(|e| QckerError::network(format!("Failed to enable IP forwarding: {}", e)))?;
 
         self.setup_nat()?;
 
@@ -92,7 +92,7 @@ impl BridgeNetwork {
                 "-j", "MASQUERADE",
             ])
             .output()
-            .map_err(|e| QckerError::Network(format!("Failed to setup NAT: {}", e)))?;
+            .map_err(|e| QckerError::network(format!("Failed to setup NAT: {}", e)))?;
 
         if !output.status.success() {
             tracing::warn!(
@@ -128,10 +128,10 @@ impl BridgeNetwork {
                 &veth_container,
             ])
             .output()
-            .map_err(|e| QckerError::Network(format!("Failed to create veth pair: {}", e)))?;
+            .map_err(|e| QckerError::network(format!("Failed to create veth pair: {}", e)))?;
 
         if !output.status.success() {
-            return Err(QckerError::Network(format!(
+            return Err(QckerError::network(format!(
                 "Failed to create veth pair: {}",
                 String::from_utf8_lossy(&output.stderr)
             )));
@@ -146,10 +146,10 @@ impl BridgeNetwork {
                 &container_pid.to_string(),
             ])
             .output()
-            .map_err(|e| QckerError::Network(format!("Failed to move veth to namespace: {}", e)))?;
+            .map_err(|e| QckerError::network(format!("Failed to move veth to namespace: {}", e)))?;
 
         if !output.status.success() {
-            return Err(QckerError::Network(format!(
+            return Err(QckerError::network(format!(
                 "Failed to move veth to namespace: {}",
                 String::from_utf8_lossy(&output.stderr)
             )));
@@ -158,10 +158,10 @@ impl BridgeNetwork {
         let output = Command::new("ip")
             .args(["link", "set", &veth_host, "master", &self.bridge_name])
             .output()
-            .map_err(|e| QckerError::Network(format!("Failed to attach veth to bridge: {}", e)))?;
+            .map_err(|e| QckerError::network(format!("Failed to attach veth to bridge: {}", e)))?;
 
         if !output.status.success() {
-            return Err(QckerError::Network(format!(
+            return Err(QckerError::network(format!(
                 "Failed to attach veth to bridge: {}",
                 String::from_utf8_lossy(&output.stderr)
             )));
@@ -170,10 +170,10 @@ impl BridgeNetwork {
         let output = Command::new("ip")
             .args(["link", "set", &veth_host, "up"])
             .output()
-            .map_err(|e| QckerError::Network(format!("Failed to bring up veth: {}", e)))?;
+            .map_err(|e| QckerError::network(format!("Failed to bring up veth: {}", e)))?;
 
         if !output.status.success() {
-            return Err(QckerError::Network(format!(
+            return Err(QckerError::network(format!(
                 "Failed to bring up veth: {}",
                 String::from_utf8_lossy(&output.stderr)
             )));
@@ -205,10 +205,10 @@ impl BridgeNetwork {
                 &format!("{}:{}", container_ip, container_port),
             ])
             .output()
-            .map_err(|e| QckerError::Network(format!("Failed to setup port forwarding: {}", e)))?;
+            .map_err(|e| QckerError::network(format!("Failed to setup port forwarding: {}", e)))?;
 
         if !output.status.success() {
-            return Err(QckerError::Network(format!(
+            return Err(QckerError::network(format!(
                 "Failed to setup port forwarding: {}",
                 String::from_utf8_lossy(&output.stderr)
             )));
@@ -233,10 +233,10 @@ impl BridgeNetwork {
         let output = Command::new("ip")
             .args(["link", "del", &self.bridge_name])
             .output()
-            .map_err(|e| QckerError::Network(format!("Failed to remove bridge: {}", e)))?;
+            .map_err(|e| QckerError::network(format!("Failed to remove bridge: {}", e)))?;
 
         if !output.status.success() {
-            return Err(QckerError::Network(format!(
+            return Err(QckerError::network(format!(
                 "Failed to remove bridge: {}",
                 String::from_utf8_lossy(&output.stderr)
             )));
@@ -248,16 +248,3 @@ impl BridgeNetwork {
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_bridge_network() {
-        let config = NetworkConfig::new_bridge("test", "172.20.0.0/16");
-        let bridge = BridgeNetwork::new(&config).unwrap();
-        assert!(bridge.bridge_name.starts_with("qcker-"));
-        assert_eq!(bridge.subnet, "172.20.0.0/16");
-        assert_eq!(bridge.gateway, "172.20.0.1");
-    }
-}

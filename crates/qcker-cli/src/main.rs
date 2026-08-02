@@ -2,6 +2,7 @@ mod commands;
 mod error_display;
 mod output;
 mod tui;
+pub mod benchmark;
 
 use clap::{Parser, Subcommand};
 use crossterm::{
@@ -11,13 +12,13 @@ use crossterm::{
 };
 use ratatui::backend::CrosstermBackend;
 use ratatui::Terminal;
-use std::io;
+use std::io::{self, IsTerminal};
 use std::path::PathBuf;
 use std::time::Duration;
 
 use tui::app::App;
 use tui::event::{AppEvent, EventHandler};
-use tui::handler::handle_key_event;
+use tui::handler::{handle_key_event, handle_click_event};
 use tui::ui::draw;
 
 #[derive(Parser)]
@@ -26,7 +27,7 @@ struct Cli {
     #[command(subcommand)]
     command: Option<Commands>,
 
-    #[arg(short, long, global = true)]
+    #[arg(short = 'l', long, global = true)]
     verbose: bool,
 
     #[arg(long, global = true, default_value = "text")]
@@ -57,6 +58,9 @@ enum Commands {
     Stop(commands::stop::StopArgs),
     Stats(commands::stats::StatsArgs),
     System(commands::system::SystemArgs),
+    Snapshot(commands::snapshot::SnapshotArgs),
+    Migrate(commands::migrate::MigrateArgs),
+    Benchmark(commands::bench::BenchmarkArgs),
 }
 
 #[tokio::main]
@@ -87,20 +91,23 @@ async fn main() -> anyhow::Result<()> {
                 Commands::Kill(args) => commands::kill::execute(args, &data_dir, &cli.format),
                 Commands::Delete(args) => commands::delete::execute(args, &data_dir, &cli.format),
                 Commands::State(args) => commands::state::execute(args, &data_dir, &cli.format),
-                Commands::Run(args) => commands::run::execute(args, &data_dir, &cli.format),
+                Commands::Run(args) => commands::run::execute(args, &data_dir, &cli.format).await,
                 Commands::Ps(args) => commands::ps::execute(args, &data_dir, &cli.format),
                 Commands::Pull(args) => commands::pull::execute(args, &data_dir, &cli.format).await,
                 Commands::Images(args) => commands::images::execute(args, &data_dir, &cli.format),
                 Commands::Build(args) => commands::build::execute(args, &data_dir, &cli.format),
                 Commands::Network(args) => commands::network::execute(args, &data_dir, &cli.format),
                 Commands::Volume(args) => commands::volume::execute(args, &data_dir, &cli.format),
-                Commands::Compose(args) => commands::compose::execute(args, &data_dir, &cli.format),
+                Commands::Compose(args) => commands::compose::execute(args, &data_dir, &cli.format).await,
                 Commands::Extension(args) => commands::extension::execute(args, &data_dir, &cli.format),
                 Commands::Exec(args) => commands::exec::execute(args, &data_dir, &cli.format),
-                Commands::Logs(args) => commands::logs::execute(args, &data_dir, &cli.format),
+                Commands::Logs(args) => commands::logs::execute(args, &data_dir, &cli.format).await,
                 Commands::Stop(args) => commands::stop::execute(args, &data_dir, &cli.format),
                 Commands::Stats(args) => commands::stats::execute(args, &data_dir, &cli.format),
                 Commands::System(args) => commands::system::execute(args, &data_dir, &cli.format),
+                Commands::Snapshot(args) => commands::snapshot::execute(args, &data_dir, &cli.format),
+                Commands::Migrate(args) => commands::migrate::execute(args, &data_dir, &cli.format),
+                Commands::Benchmark(args) => commands::bench::execute(args, &data_dir, &cli.format),
             }
         }
         None => {
@@ -110,8 +117,15 @@ async fn main() -> anyhow::Result<()> {
 }
 
 fn run_tui(data_dir: PathBuf) -> anyhow::Result<()> {
+    let stdout = io::stdout();
+    let is_tty = std::io::stdout().is_terminal();
+    if !is_tty {
+        println!("Qcker TUI requires a TTY. Use commands like 'qcker ps' instead.");
+        return Ok(());
+    }
+
     enable_raw_mode()?;
-    let mut stdout = io::stdout();
+    let mut stdout = stdout;
     execute!(stdout, EnterAlternateScreen, EnableMouseCapture)?;
     let backend = CrosstermBackend::new(stdout);
     let mut terminal = Terminal::new(backend)?;
@@ -127,6 +141,9 @@ fn run_tui(data_dir: PathBuf) -> anyhow::Result<()> {
         match events.next()? {
             AppEvent::Input(key) => {
                 handle_key_event(&mut app, key);
+            }
+            AppEvent::Click(mouse) => {
+                handle_click_event(&mut app, mouse);
             }
             AppEvent::Tick => {}
         }
@@ -146,3 +163,4 @@ fn run_tui(data_dir: PathBuf) -> anyhow::Result<()> {
 
     Ok(())
 }
+

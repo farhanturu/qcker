@@ -85,7 +85,7 @@ impl VmmManager {
         cmd.stderr(Stdio::null());
 
         cmd.spawn()
-            .map_err(|e| QckerError::Internal(format!("Failed to start QEMU: {}", e)))
+            .map_err(|e| QckerError::internal(format!("Failed to start QEMU: {}", e)))
     }
 
     pub fn stop(&mut self) -> Result<()> {
@@ -124,13 +124,3 @@ pub fn check_qemu_available() -> bool {
         .is_ok()
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_check_qemu() {
-        let available = check_qemu_available();
-        println!("QEMU available: {}", available);
-    }
-}

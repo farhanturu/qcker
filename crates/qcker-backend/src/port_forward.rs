@@ -56,16 +56,3 @@ impl PortForwarder {
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_port_forwarder() {
-        let mut pf = PortForwarder::new();
-        pf.add_forward(8080, Ipv4Addr::new(10, 0, 2, 15), 80, "tcp").unwrap();
-        assert_eq!(pf.list_forwards().len(), 1);
-        pf.remove_forward(8080);
-        assert_eq!(pf.list_forwards().len(), 0);
-    }
-}

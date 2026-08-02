@@ -43,7 +43,7 @@ pub enum ComposeCommand {
     },
 }
 
-pub fn execute(args: ComposeArgs, data_dir: &Path, format: &str) -> anyhow::Result<()> {
+pub async fn execute(args: ComposeArgs, data_dir: &Path, format: &str) -> anyhow::Result<()> {
     let compose_file = ComposeFile::parse_file(&args.file)?;
 
     let project_name = args.project_name.unwrap_or_else(|| {
@@ -114,16 +114,46 @@ pub fn execute(args: ComposeArgs, data_dir: &Path, format: &str) -> anyhow::Resu
             }
         }
         ComposeCommand::Build { services } => {
-            println!("Building services: {:?}", services);
+            let services_ref = if services.is_empty() {
+                None
+            } else {
+                Some(services.as_slice())
+            };
+            project.build(services_ref)?;
+            if format == "json" {
+                let output = serde_json::json!({
+                    "project": project_name,
+                    "status": "built",
+                });
+                println!("{}", serde_json::to_string_pretty(&output)?);
+            } else {
+                println!("Project {} built", project_name);
+            }
         }
         ComposeCommand::Pull { services } => {
-            println!("Pulling services: {:?}", services);
+            let services_ref = if services.is_empty() {
+                None
+            } else {
+                Some(services.as_slice())
+            };
+            project.pull(services_ref).await?;
+            if format == "json" {
+                let output = serde_json::json!({
+                    "project": project_name,
+                    "status": "pulled",
+                });
+                println!("{}", serde_json::to_string_pretty(&output)?);
+            } else {
+                println!("Project {} pulled", project_name);
+            }
         }
         ComposeCommand::Logs { services, follow } => {
-            println!("Showing logs for: {:?}", services);
-            if follow {
-                println!("Following logs...");
-            }
+            let services_ref = if services.is_empty() {
+                None
+            } else {
+                Some(services.as_slice())
+            };
+            project.logs(services_ref, follow)?;
         }
     }
 

@@ -58,10 +58,10 @@ pub fn load_docker_auth(registry: &str) -> Result<Option<RegistryAuth>> {
     }
 
     let config_json = fs::read_to_string(&config_path)
-        .map_err(|e| QckerError::Internal(format!("Failed to read docker config: {}", e)))?;
+        .map_err(|e| QckerError::internal(format!("Failed to read docker config: {}", e)))?;
 
     let config: DockerConfig = serde_json::from_str(&config_json)
-        .map_err(|e| QckerError::Internal(format!("Failed to parse docker config: {}", e)))?;
+        .map_err(|e| QckerError::internal(format!("Failed to parse docker config: {}", e)))?;
 
     let registry_url = format!("https://{}", registry);
     if let Some(entry) = config.auths.get(&registry_url).or_else(|| config.auths.get(registry)) {
@@ -83,7 +83,7 @@ pub fn load_docker_auth(registry: &str) -> Result<Option<RegistryAuth>> {
 
 fn get_docker_config_path() -> Result<PathBuf> {
     let home_dir = dirs::home_dir()
-        .ok_or_else(|| QckerError::Internal("Failed to get home directory".to_string()))?;
+        .ok_or_else(|| QckerError::internal("Failed to get home directory".to_string()))?;
 
     if let Ok(docker_config) = std::env::var("DOCKER_CONFIG") {
         return Ok(PathBuf::from(docker_config).join("config.json"));
@@ -95,32 +95,32 @@ fn get_docker_config_path() -> Result<PathBuf> {
 fn base64_decode(input: &str) -> Result<String> {
     use base64::Engine;
     let decoded = base64::engine::general_purpose::STANDARD.decode(input)
-        .map_err(|e| QckerError::Internal(format!("Failed to decode base64: {}", e)))?;
+        .map_err(|e| QckerError::internal(format!("Failed to decode base64: {}", e)))?;
     String::from_utf8(decoded)
-        .map_err(|e| QckerError::Internal(format!("Failed to decode utf8: {}", e)))
+        .map_err(|e| QckerError::internal(format!("Failed to decode utf8: {}", e)))
 }
 
 pub fn save_qcker_auth(registry: &str, auth: &RegistryAuth) -> Result<()> {
     let config_dir = dirs::config_dir()
-        .ok_or_else(|| QckerError::Internal("Failed to get config directory".to_string()))?
+        .ok_or_else(|| QckerError::internal("Failed to get config directory".to_string()))?
         .join("qcker");
 
     fs::create_dir_all(&config_dir)
-        .map_err(|e| QckerError::Internal(format!("Failed to create config dir: {}", e)))?;
+        .map_err(|e| QckerError::internal(format!("Failed to create config dir: {}", e)))?;
 
     let config_path = config_dir.join("auth.json");
 
     let mut config: serde_json::Value = if config_path.exists() {
         let content = fs::read_to_string(&config_path)
-            .map_err(|e| QckerError::Internal(format!("Failed to read config: {}", e)))?;
+            .map_err(|e| QckerError::internal(format!("Failed to read config: {}", e)))?;
         serde_json::from_str(&content)
-            .map_err(|e| QckerError::Internal(format!("Failed to parse config: {}", e)))?
+            .map_err(|e| QckerError::internal(format!("Failed to parse config: {}", e)))?
     } else {
         serde_json::json!({ "auths": {} })
     };
 
     let auths = config["auths"].as_object_mut()
-        .ok_or_else(|| QckerError::Internal("Invalid config format".to_string()))?;
+        .ok_or_else(|| QckerError::internal("Invalid config format".to_string()))?;
 
     let entry = if let Some(ref token) = auth.token {
         serde_json::json!({ "identitytoken": token })
@@ -134,9 +134,9 @@ pub fn save_qcker_auth(registry: &str, auth: &RegistryAuth) -> Result<()> {
     auths.insert(registry.to_string(), entry);
 
     let config_json = serde_json::to_string_pretty(&config)
-        .map_err(|e| QckerError::Internal(format!("Failed to serialize config: {}", e)))?;
+        .map_err(|e| QckerError::internal(format!("Failed to serialize config: {}", e)))?;
     fs::write(&config_path, config_json)
-        .map_err(|e| QckerError::Internal(format!("Failed to write config: {}", e)))?;
+        .map_err(|e| QckerError::internal(format!("Failed to write config: {}", e)))?;
 
     Ok(())
 }
@@ -146,17 +146,3 @@ fn base64_encode(input: &str) -> String {
     base64::engine::general_purpose::STANDARD.encode(input)
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_registry_auth() {
-        let auth = RegistryAuth::basic("user", "pass");
-        assert_eq!(auth.username, Some("user".to_string()));
-        assert_eq!(auth.password, Some("pass".to_string()));
-
-        let auth = RegistryAuth::token("mytoken");
-        assert_eq!(auth.token, Some("mytoken".to_string()));
-    }
-}

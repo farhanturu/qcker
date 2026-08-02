@@ -12,3 +12,4 @@ pub mod terminal;
 pub mod user;
 
 pub use spec::{Container, ContainerState, OciConfig};
+pub mod snapshot;

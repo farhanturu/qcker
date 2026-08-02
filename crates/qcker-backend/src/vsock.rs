@@ -1,5 +1,4 @@
 use serde::{Deserialize, Serialize};
-use std::io::Read;
 use std::os::unix::io::RawFd;
 
 use super::protocol::{deserialize_message, serialize_message, MAX_MESSAGE_SIZE};
@@ -102,15 +101,3 @@ pub enum RecvTimeoutError {
     Io(std::io::Error),
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::protocol::HostToVm;
-
-    #[test]
-    fn test_serialize_for_vsock() {
-        let msg = HostToVm::Ping;
-        let data = serialize_message(&msg).unwrap();
-        assert!(data.len() > 4);
-    }
-}

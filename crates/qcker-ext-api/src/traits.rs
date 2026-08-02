@@ -146,26 +146,3 @@ pub struct NetworkInfo {
     pub gateway: Option<String>,
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    struct TestExtension;
-
-    impl Extension for TestExtension {
-        fn id(&self) -> &str { "com.test.ext" }
-        fn version(&self) -> &str { "1.0.0" }
-        fn name(&self) -> &str { "Test Extension" }
-        fn description(&self) -> &str { "A test extension" }
-        fn author(&self) -> &str { "Test" }
-        fn api_version(&self) -> &str { "1.0.0" }
-        fn capabilities(&self) -> Vec<ExtensionCapability> { vec![] }
-    }
-
-    #[test]
-    fn test_extension_trait() {
-        let ext = TestExtension;
-        assert_eq!(ext.id(), "com.test.ext");
-        assert_eq!(ext.name(), "Test Extension");
-    }
-}

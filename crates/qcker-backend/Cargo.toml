@@ -7,6 +7,7 @@ description = "Qcker runtime backend abstraction - native, MicroVM, WSL2"
 
 [dependencies]
 qcker-common = { path = "../qcker-common" }
+qcker-runtime = { path = "../qcker-runtime" }
 async-trait = "0.1"
 tokio = { workspace = true }
 serde = { workspace = true }

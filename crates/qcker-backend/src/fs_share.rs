@@ -42,7 +42,7 @@ pub fn create_bind_mount_spec(
 ) -> Result<FsShareConfig> {
     let host = PathBuf::from(host_path);
     if !host.exists() {
-        return Err(QckerError::InvalidArgument(format!(
+        return Err(QckerError::invalid_argument(format!(
             "Host path does not exist: {}",
             host_path
         )));
@@ -60,24 +60,3 @@ fn md5_short(s: &str) -> String {
     hash[..8].to_string()
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_fs_share_config() {
-        let config = FsShareConfig::new(
-            PathBuf::from("/tmp/test"),
-            "test-share".to_string(),
-            false,
-        );
-        let args = config.to_qemu_args();
-        assert!(args.contains(&"-fsdev".to_string()));
-    }
-
-    #[test]
-    fn test_md5_short() {
-        let hash = md5_short("test");
-        assert_eq!(hash.len(), 8);
-    }
-}

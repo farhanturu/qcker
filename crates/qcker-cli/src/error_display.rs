@@ -1,5 +1,6 @@
 use qcker_error::{QckerError, ErrorSeverity};
 
+#[allow(dead_code)]
 pub fn display_error(err: &QckerError, format: &str) {
     match format {
         "json" => display_json(err),

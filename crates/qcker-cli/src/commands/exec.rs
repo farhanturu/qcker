@@ -29,7 +29,7 @@ pub fn execute(args: ExecArgs, data_dir: &Path, format: &str) -> anyhow::Result<
         data_dir: data_dir.to_path_buf(),
     };
 
-    process.exec(&args.command)?;
+    process.exec(&args.command, args.terminal, args.interactive)?;
 
     if format == "json" {
         let output = serde_json::json!({

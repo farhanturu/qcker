@@ -1,4 +1,5 @@
 pub mod build;
+pub mod bench;
 pub mod compose;
 pub mod create;
 pub mod delete;
@@ -11,9 +12,11 @@ pub mod network;
 pub mod ps;
 pub mod pull;
 pub mod run;
+pub mod snapshot;
 pub mod start;
 pub mod state;
 pub mod stats;
 pub mod stop;
 pub mod system;
 pub mod volume;
+pub mod migrate;

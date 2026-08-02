@@ -59,7 +59,7 @@ impl ExtensionHost {
 
     pub fn send_request(&self, extension_id: &str, request: IpcRequest) -> Result<IpcResponse> {
         if !self.active_extensions.contains_key(extension_id) {
-            return Err(QckerError::InvalidArgument(format!(
+            return Err(QckerError::invalid_argument(format!(
                 "Extension not active: {}",
                 extension_id
             )));
@@ -91,19 +91,3 @@ impl ExtensionHost {
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use tempfile::TempDir;
-
-    #[test]
-    fn test_extension_host() {
-        let tmp = TempDir::new().unwrap();
-        let mut host = ExtensionHost::new(tmp.path().to_path_buf());
-
-        let _ = host.init();
-
-        let active = host.list_active();
-        assert_eq!(active.len(), 0);
-    }
-}

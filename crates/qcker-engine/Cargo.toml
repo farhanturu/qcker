@@ -8,6 +8,7 @@ description = "Qcker engine - image management and registry client"
 [dependencies]
 qcker-common = { path = "../qcker-common" }
 qcker-ext-api = { path = "../qcker-ext-api" }
+qcker-runtime = { path = "../qcker-runtime" }
 serde = { workspace = true }
 serde_json = { workspace = true }
 sha2 = { workspace = true }

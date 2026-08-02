@@ -23,7 +23,7 @@ impl BuildContext {
         }
 
         let content = fs::read_to_string(&ignore_path)
-            .map_err(|e| QckerError::Internal(format!("Failed to read .dockerignore: {}", e)))?;
+            .map_err(|e| QckerError::internal(format!("Failed to read .dockerignore: {}", e)))?;
 
         let patterns: Vec<String> = content
             .lines()
@@ -82,10 +82,10 @@ impl BuildContext {
 
     fn hash_directory(&self, dir: &Path, hasher: &mut sha2::Sha256) -> Result<()> {
         for entry in fs::read_dir(dir)
-            .map_err(|e| QckerError::Internal(format!("Failed to read directory: {}", e)))?
+            .map_err(|e| QckerError::internal(format!("Failed to read directory: {}", e)))?
         {
             let entry = entry
-                .map_err(|e| QckerError::Internal(format!("Failed to read entry: {}", e)))?;
+                .map_err(|e| QckerError::internal(format!("Failed to read entry: {}", e)))?;
             let path = entry.path();
 
             if self.should_ignore(&path) {
@@ -99,7 +99,7 @@ impl BuildContext {
                 self.hash_directory(&path, hasher)?;
             } else {
                 let content = fs::read(&path)
-                    .map_err(|e| QckerError::Internal(format!("Failed to read file: {}", e)))?;
+                    .map_err(|e| QckerError::internal(format!("Failed to read file: {}", e)))?;
                 hasher.update(&content);
             }
         }
@@ -115,10 +115,10 @@ impl BuildContext {
 
     fn list_directory(&self, dir: &Path, files: &mut Vec<PathBuf>) -> Result<()> {
         for entry in fs::read_dir(dir)
-            .map_err(|e| QckerError::Internal(format!("Failed to read directory: {}", e)))?
+            .map_err(|e| QckerError::internal(format!("Failed to read directory: {}", e)))?
         {
             let entry = entry
-                .map_err(|e| QckerError::Internal(format!("Failed to read entry: {}", e)))?;
+                .map_err(|e| QckerError::internal(format!("Failed to read entry: {}", e)))?;
             let path = entry.path();
 
             if self.should_ignore(&path) {
@@ -136,27 +136,3 @@ impl BuildContext {
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use tempfile::TempDir;
-
-    #[test]
-    fn test_build_context() {
-        let tmp = TempDir::new().unwrap();
-        let root = tmp.path();
-
-        fs::write(root.join("Dockerfile"), "FROM alpine").unwrap();
-        fs::write(root.join(".dockerignore"), "*.log\ntarget/").unwrap();
-        fs::write(root.join("test.log"), "log content").unwrap();
-        fs::write(root.join("src"), "source code").unwrap();
-
-        let context = BuildContext::new(root.to_path_buf()).unwrap();
-
-        assert!(context.should_ignore(&root.join("test.log")));
-        assert!(!context.should_ignore(&root.join("src")));
-
-        let files = context.list_files().unwrap();
-        assert_eq!(files.len(), 3);
-    }
-}

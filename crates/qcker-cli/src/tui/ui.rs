@@ -11,59 +11,32 @@ use super::app::{ActiveTab, App, AppMode};
 pub fn draw(f: &mut Frame, app: &App) {
     let chunks = Layout::default()
         .direction(Direction::Vertical)
-        .constraints([
-            Constraint::Length(3),
-            Constraint::Min(0),
-            Constraint::Length(3),
-        ])
+        .constraints([Constraint::Length(3), Constraint::Min(0), Constraint::Length(3)])
         .split(f.area());
-
     draw_header(f, app, chunks[0]);
     draw_content(f, app, chunks[1]);
     draw_footer(f, app, chunks[2]);
-
     match app.mode {
         AppMode::ConfirmDelete => draw_confirm_popup(f, app),
-        AppMode::CommandInput => draw_command_popup(f, app),
+        AppMode::NewContainer => draw_new_container_popup(f, app),
+        AppMode::ImagePull => draw_pull_image_popup(f, app),
         _ => {}
     }
-
-    if app.show_help {
-        draw_help_popup(f);
-    }
+    if app.show_help { draw_help_popup(f); }
 }
 
 fn draw_header(f: &mut Frame, app: &App, area: Rect) {
-    let titles = vec![
-        "Containers",
-        "Images",
-        "Networks",
-        "Volumes",
-        "Files",
-        "Editor",
-        "Marketplace",
-        "Logs",
-    ];
-
+    let titles = vec!["Containers", "Images", "Networks", "Volumes", "Stats", "Extensions", "Logs"];
     let selected = match app.active_tab {
-        ActiveTab::Containers => 0,
-        ActiveTab::Images => 1,
-        ActiveTab::Networks => 2,
-        ActiveTab::Volumes => 3,
-        ActiveTab::Files => 4,
-        ActiveTab::Editor => 5,
-        ActiveTab::Marketplace => 6,
-        ActiveTab::Logs => 7,
+        ActiveTab::Containers => 0, ActiveTab::Images => 1, ActiveTab::Networks => 2,
+        ActiveTab::Volumes => 3, ActiveTab::Stats => 4, ActiveTab::Extensions => 5,
+        ActiveTab::Logs => 6,
     };
-
     let tabs = Tabs::new(titles)
-        .block(Block::default()
-            .borders(Borders::ALL)
-            .title("Qcker"))
+        .block(Block::default().borders(Borders::ALL).title(" Qcker Dashboard "))
         .select(selected)
         .style(Style::default().fg(Color::White))
         .highlight_style(Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD));
-
     f.render_widget(tabs, area);
 }
 
@@ -73,339 +46,202 @@ fn draw_content(f: &mut Frame, app: &App, area: Rect) {
         ActiveTab::Images => draw_images(f, app, area),
         ActiveTab::Networks => draw_networks(f, app, area),
         ActiveTab::Volumes => draw_volumes(f, app, area),
-        ActiveTab::Files => draw_files(f, app, area),
-        ActiveTab::Editor => draw_editor(f, app, area),
-        ActiveTab::Marketplace => draw_marketplace(f, app, area),
+        ActiveTab::Stats => draw_stats(f, app, area),
+        ActiveTab::Extensions => draw_extensions(f, app, area),
         ActiveTab::Logs => draw_logs(f, app, area),
     }
 }
 
 fn draw_containers(f: &mut Frame, app: &App, area: Rect) {
-    let header = Row::new(vec![
-        Cell::from("ID"),
-        Cell::from("NAME"),
-        Cell::from("STATUS"),
-        Cell::from("IMAGE"),
-        Cell::from("PID"),
-        Cell::from("CREATED"),
-    ])
-    .style(Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD))
-    .height(1);
+    let sel = app.selected_action;
+    let actions = ["NEW","START","STOP","DEL","EXEC","LOGS"];
+    let mut btn_parts: Vec<Span> = Vec::new();
+    btn_parts.push(Span::raw("["));
+    for (i, name) in actions.iter().enumerate() {
+        let is_sel = i == sel;
+        let fg = if is_sel { Color::Black } else { Color::White };
+        let bg = if is_sel { Color::Yellow } else { Color::DarkGray };
+        btn_parts.push(Span::styled(name.to_string(), Style::default().fg(fg).bg(bg)));
+        btn_parts.push(Span::raw("] "));
+    }
+    let btn_para = Paragraph::new(Line::from(btn_parts))
+        .style(Style::default().bg(Color::Blue));
+    f.render_widget(btn_para, area);
 
-    let rows: Vec<Row> = app.containers.iter().enumerate().map(|(i, c)| {
+    let header = Row::new(vec!["ID","NAME","STATUS","IMAGE","PID","CREATED"])
+        .style(Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)).height(1);
+
+    let rows: Vec<Row> = app.containers.iter().enumerate().skip(app.scroll_offset).map(|(i, c)| {
         let style = if i == app.selected_index {
             Style::default().bg(Color::DarkGray).fg(Color::White)
-        } else {
-            Style::default().fg(Color::White)
-        };
-
-        let status_style = match c.status.as_str() {
+        } else { Style::default().fg(Color::White) };
+        let ss = match c.status.as_str() {
             "running" => Style::default().fg(Color::Green),
             "created" => Style::default().fg(Color::Yellow),
             "stopped" => Style::default().fg(Color::Red),
             _ => Style::default().fg(Color::Gray),
         };
-
         Row::new(vec![
-            Cell::from(truncate(&c.id, 12)),
-            Cell::from(truncate(&c.name, 18)),
-            Cell::from(Span::styled(truncate(&c.status, 10), status_style)),
+            Cell::from(truncate(&c.id, 12)), Cell::from(truncate(&c.name, 18)),
+            Cell::from(Span::styled(truncate(&c.status, 10), ss)),
             Cell::from(truncate(&c.image, 18)),
             Cell::from(c.pid.map_or("-".to_string(), |p| p.to_string())),
             Cell::from(truncate(&c.created, 16)),
-        ])
-        .style(style)
-        .height(1)
+        ]).style(style).height(1)
     }).collect();
 
-    let table = Table::new(
-        rows,
-        [
-            Constraint::Length(13),
-            Constraint::Length(19),
-            Constraint::Length(11),
-            Constraint::Length(19),
-            Constraint::Length(8),
-            Constraint::Min(17),
-        ],
-    )
-    .header(header)
-    .block(Block::default()
-        .borders(Borders::ALL)
-        .title(format!("Containers ({})", app.containers.len())));
-
+    let table = Table::new(rows, [
+        Constraint::Length(13), Constraint::Length(19), Constraint::Length(11),
+        Constraint::Length(19), Constraint::Length(8), Constraint::Min(17),
+    ]).header(header)
+    .block(Block::default().borders(Borders::ALL)
+        .title(format!(" Containers ({}) ", app.containers.len())));
     f.render_widget(table, area);
 }
 
 fn draw_images(f: &mut Frame, app: &App, area: Rect) {
-    let header = Row::new(vec![
-        Cell::from("ID"),
-        Cell::from("TAGS"),
-        Cell::from("SIZE"),
-        Cell::from("CREATED"),
-    ])
-    .style(Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD))
-    .height(1);
-
-    let rows: Vec<Row> = app.images.iter().enumerate().map(|(i, img)| {
-        let style = if i == app.selected_index {
-            Style::default().bg(Color::DarkGray).fg(Color::White)
-        } else {
-            Style::default().fg(Color::White)
-        };
-
+    let header = Row::new(vec!["ID","TAGS","SIZE","CREATED"])
+        .style(Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)).height(1);
+    let rows: Vec<Row> = app.images.iter().enumerate().skip(app.scroll_offset).map(|(i, img)| {
+        let style = if i == app.selected_index { Style::default().bg(Color::DarkGray).fg(Color::White) }
+        else { Style::default().fg(Color::White) };
         Row::new(vec![
-            Cell::from(truncate(&img.id, 12)),
-            Cell::from(truncate(&img.tags, 30)),
-            Cell::from(truncate(&img.size, 10)),
-            Cell::from(truncate(&img.created, 16)),
-        ])
-        .style(style)
-        .height(1)
+            Cell::from(truncate(&img.id, 12)), Cell::from(truncate(&img.tags, 30)),
+            Cell::from(truncate(&img.size, 10)), Cell::from(truncate(&img.created, 16)),
+        ]).style(style).height(1)
     }).collect();
-
-    let table = Table::new(
-        rows,
-        [
-            Constraint::Length(13),
-            Constraint::Min(31),
-            Constraint::Length(11),
-            Constraint::Length(17),
-        ],
-    )
-    .header(header)
-    .block(Block::default()
-        .borders(Borders::ALL)
-        .title(format!("Images ({})", app.images.len())));
-
+    let table = Table::new(rows, [
+        Constraint::Length(13), Constraint::Min(31), Constraint::Length(11), Constraint::Length(17),
+    ]).header(header).block(Block::default().borders(Borders::ALL)
+        .title(format!(" Images ({}) ", app.images.len())));
     f.render_widget(table, area);
 }
 
 fn draw_networks(f: &mut Frame, app: &App, area: Rect) {
-    let header = Row::new(vec![
-        Cell::from("ID"),
-        Cell::from("NAME"),
-        Cell::from("DRIVER"),
-        Cell::from("SUBNET"),
-    ])
-    .style(Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD))
-    .height(1);
-
-    let rows: Vec<Row> = app.networks.iter().enumerate().map(|(i, n)| {
-        let style = if i == app.selected_index {
-            Style::default().bg(Color::DarkGray).fg(Color::White)
-        } else {
-            Style::default().fg(Color::White)
-        };
-
+    let header = Row::new(vec!["ID","NAME","DRIVER","SUBNET"])
+        .style(Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)).height(1);
+    let rows: Vec<Row> = app.networks.iter().enumerate().skip(app.scroll_offset).map(|(i, n)| {
+        let style = if i == app.selected_index { Style::default().bg(Color::DarkGray).fg(Color::White) }
+        else { Style::default().fg(Color::White) };
         Row::new(vec![
-            Cell::from(truncate(&n.id, 12)),
-            Cell::from(truncate(&n.name, 18)),
-            Cell::from(truncate(&n.driver, 10)),
-            Cell::from(truncate(&n.subnet, 18)),
-        ])
-        .style(style)
-        .height(1)
+            Cell::from(truncate(&n.id, 12)), Cell::from(truncate(&n.name, 18)),
+            Cell::from(truncate(&n.driver, 10)), Cell::from(truncate(&n.subnet, 18)),
+        ]).style(style).height(1)
     }).collect();
-
-    let table = Table::new(
-        rows,
-        [
-            Constraint::Length(13),
-            Constraint::Length(19),
-            Constraint::Length(11),
-            Constraint::Min(19),
-        ],
-    )
-    .header(header)
-    .block(Block::default()
-        .borders(Borders::ALL)
-        .title(format!("Networks ({})", app.networks.len())));
-
+    let table = Table::new(rows, [
+        Constraint::Length(13), Constraint::Length(19), Constraint::Length(11), Constraint::Min(19),
+    ]).header(header).block(Block::default().borders(Borders::ALL)
+        .title(format!(" Networks ({}) ", app.networks.len())));
     f.render_widget(table, area);
 }
 
 fn draw_volumes(f: &mut Frame, app: &App, area: Rect) {
-    let header = Row::new(vec![
-        Cell::from("NAME"),
-        Cell::from("DRIVER"),
-        Cell::from("MOUNTPOINT"),
-    ])
-    .style(Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD))
-    .height(1);
-
-    let rows: Vec<Row> = app.volumes.iter().enumerate().map(|(i, v)| {
-        let style = if i == app.selected_index {
-            Style::default().bg(Color::DarkGray).fg(Color::White)
-        } else {
-            Style::default().fg(Color::White)
-        };
-
+    let header = Row::new(vec!["NAME","DRIVER","MOUNTPOINT"])
+        .style(Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)).height(1);
+    let rows: Vec<Row> = app.volumes.iter().enumerate().skip(app.scroll_offset).map(|(i, v)| {
+        let style = if i == app.selected_index { Style::default().bg(Color::DarkGray).fg(Color::White) }
+        else { Style::default().fg(Color::White) };
         Row::new(vec![
-            Cell::from(truncate(&v.name, 18)),
-            Cell::from(truncate(&v.driver, 10)),
+            Cell::from(truncate(&v.name, 18)), Cell::from(truncate(&v.driver, 10)),
             Cell::from(truncate(&v.mountpoint, 40)),
-        ])
-        .style(style)
-        .height(1)
+        ]).style(style).height(1)
     }).collect();
-
-    let table = Table::new(
-        rows,
-        [
-            Constraint::Length(19),
-            Constraint::Length(11),
-            Constraint::Min(41),
-        ],
-    )
-    .header(header)
-    .block(Block::default()
-        .borders(Borders::ALL)
-        .title(format!("Volumes ({})", app.volumes.len())));
-
+    let table = Table::new(rows, [
+        Constraint::Length(19), Constraint::Length(11), Constraint::Min(41),
+    ]).header(header).block(Block::default().borders(Borders::ALL)
+        .title(format!(" Volumes ({}) ", app.volumes.len())));
     f.render_widget(table, area);
 }
 
-fn draw_files(f: &mut Frame, app: &App, area: Rect) {
-    let chunks = Layout::default()
-        .direction(Direction::Horizontal)
-        .constraints([Constraint::Percentage(30), Constraint::Percentage(70)])
-        .split(area);
+fn draw_stats(f: &mut Frame, app: &App, area: Rect) {
+    let s = &app.system_stats;
+    let mut lines: Vec<Line> = vec![
+        Line::from(Span::styled("System Overview", Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD))),
+        Line::from(""),
+        Line::from(vec![
+            Span::styled("CPU: ", Style::default().fg(Color::Yellow)),
+            Span::styled(format!("{:.1}%", s.cpu_percent), Style::default().fg(Color::White)),
+            Span::styled("  Memory: ", Style::default().fg(Color::Yellow)),
+            Span::styled(format!("{:.0}MB / {:.0}MB ({:.1}%)", s.mem_used_mb, s.mem_total_mb, s.mem_percent), Style::default().fg(Color::White)),
+        ]),
+    ];
+    let ups = App::format_uptime(s.uptime_secs);
+    lines.push(Line::from(vec![
+        Span::styled("Load Avg: ", Style::default().fg(Color::Yellow)),
+        Span::styled(format!("{:.2} {:.2} {:.2}", s.load_avg[0], s.load_avg[1], s.load_avg[2]), Style::default().fg(Color::White)),
+        Span::styled("  Uptime: ", Style::default().fg(Color::Yellow)),
+        Span::styled(&ups, Style::default().fg(Color::White)),
+    ]));
+    lines.push(Line::from(""));
+    lines.push(Line::from(Span::styled("Container Summary", Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD))));
+    lines.push(Line::from(""));
+    lines.push(Line::from(vec![
+        Span::styled("Running: ", Style::default().fg(Color::Green)),
+        Span::styled(format!("{}", s.running), Style::default().fg(Color::Green)),
+        Span::styled("  Stopped: ", Style::default().fg(Color::Red)),
+        Span::styled(format!("{}", s.stopped), Style::default().fg(Color::Red)),
+        Span::styled("  Images: ", Style::default().fg(Color::Yellow)),
+        Span::styled(format!("{}", s.total_images), Style::default().fg(Color::Yellow)),
+        Span::styled("  Volumes: ", Style::default().fg(Color::Cyan)),
+        Span::styled(format!("{}", s.total_volumes), Style::default().fg(Color::Cyan)),
+    ]));
+    lines.push(Line::from(""));
+    lines.push(Line::from(Span::styled("Per-Container Stats", Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD))));
+    lines.push(Line::from(""));
 
-    let mut items: Vec<ListItem> = Vec::new();
-
-    if app.current_path != "/" {
-        items.push(ListItem::new(Line::from(Span::styled(
-            ".. (parent)",
-            Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD),
-        ))));
-    }
-
-    for (i, file) in app.files.iter().enumerate() {
-        let style = if i == app.selected_index {
-            Style::default().bg(Color::DarkGray).fg(Color::White)
-        } else if file.is_dir {
-            Style::default().fg(Color::Cyan)
-        } else {
-            Style::default().fg(Color::White)
-        };
-
-        let icon = if file.is_dir { "d" } else { "f" };
-        let size = if file.is_dir {
-            String::new()
-        } else {
-            format_size(file.size)
-        };
-
-        items.push(ListItem::new(Line::from(vec![
-            Span::styled(format!("[{}] ", icon), style),
-            Span::styled(truncate(&file.name, 20), style),
-            Span::styled(format!("  {}", size), Style::default().fg(Color::Gray)),
-        ])));
-    }
-
-    let list = List::new(items)
-        .block(Block::default()
-            .borders(Borders::ALL)
-            .title(truncate(&format!("Files: {}", app.current_path), 40)));
-
-    f.render_widget(list, chunks[0]);
-
-    let preview = if let Some(file) = app.files.get(app.selected_index) {
-        if file.is_dir {
-            "<Directory>".to_string()
-        } else {
-            let rootfs = app.data_dir.join("containers")
-                .join(app.selected_container.as_deref().unwrap_or(""))
-                .join("rootfs");
-            let full_path = rootfs.join(file.path.trim_start_matches('/'));
-
-            if let Ok(content) = std::fs::read_to_string(&full_path) {
-                let truncated = if content.len() > 2000 {
-                    format!("{}...\n\n[Truncated - {} bytes total]", &content[..2000], content.len())
-                } else {
-                    content
-                };
-                truncated
-            } else {
-                "<Cannot read file>".to_string()
-            }
-        }
+    if app.containers.is_empty() {
+        lines.push(Line::from(Span::styled("  No containers running", Style::default().fg(Color::Gray))));
     } else {
-        "<Select a file>".to_string()
-    };
+        for c in &app.containers.iter().take(10).collect::<Vec<_>>() {
+            let st = app.container_stats.get(&c.id);
+            let cpu = st.map(|s| format!("{:.1}%", s.cpu_percent)).unwrap_or("-".to_string());
+            let mem = st.map(|s| format!("{:.1} MB", s.memory_mb)).unwrap_or("-".to_string());
+            let pids = st.map(|s| s.pids.to_string()).unwrap_or("-".to_string());
+            let color = match c.status.as_str() { "running" => Color::Green, "paused" => Color::Yellow, _ => Color::Red };
+            lines.push(Line::from(vec![
+                Span::styled(&c.name, Style::default().fg(Color::White)),
+                Span::styled(format!("  CPU: {}  Mem: {}  PIDs: {}", cpu, mem, pids), Style::default().fg(color)),
+            ]));
+        }
+        if app.containers.len() > 10 {
+            lines.push(Line::from(Span::styled(format!("  ... and {} more", app.containers.len() - 10), Style::default().fg(Color::Gray))));
+        }
+    }
 
-    let preview_widget = Paragraph::new(preview)
-        .block(Block::default()
-            .borders(Borders::ALL)
-            .title("Preview"))
-        .style(Style::default().fg(Color::White))
+    let para = Paragraph::new(lines)
+        .block(Block::default().borders(Borders::ALL)
+            .title(format!(" System Stats — {} containers ", app.containers.len())))
         .wrap(ratatui::widgets::Wrap { trim: true });
-
-    f.render_widget(preview_widget, chunks[1]);
+    f.render_widget(para, area);
 }
 
-fn draw_editor(f: &mut Frame, app: &App, area: Rect) {
-    let chunks = Layout::default()
-        .direction(Direction::Vertical)
-        .constraints([Constraint::Min(0), Constraint::Length(1)])
-        .split(area);
+fn draw_extensions(f: &mut Frame, app: &App, area: Rect) {
+    use super::app::MarketplaceExt;
+    let exts = &app.extensions;
 
-    let lines: Vec<Line> = app.editor_content
-        .lines()
-        .enumerate()
-        .map(|(i, line)| {
-            let line_num = format!("{:4} ", i + 1);
-            Line::from(vec![
-                Span::styled(line_num, Style::default().fg(Color::DarkGray)),
-                Span::styled(truncate(line, 100), Style::default().fg(Color::White)),
-            ])
-        })
-        .collect();
+    // Action bar
+    let sel = app.selected_action;
+    let actions = ["INST","ENBL","DSBL","UNST"];
+    let mut btn_parts: Vec<Span> = Vec::new();
+    btn_parts.push(Span::raw("["));
+    for (i, name) in actions.iter().enumerate() {
+        let is_sel = i == sel;
+        let fg = if is_sel { Color::Black } else { Color::White };
+        let bg = if is_sel { Color::Yellow } else { Color::DarkGray };
+        btn_parts.push(Span::styled(name.to_string(), Style::default().fg(fg).bg(bg)));
+        btn_parts.push(Span::raw("] "));
+    }
+    let btn_para = Paragraph::new(Line::from(btn_parts))
+        .style(Style::default().bg(Color::Blue));
+    f.render_widget(btn_para, area);
 
-    let editor = Paragraph::new(lines)
-        .block(Block::default()
-            .borders(Borders::ALL)
-            .title(if app.editor_modified {
-                "Editor *"
-            } else {
-                "Editor"
-            }))
-        .style(Style::default().fg(Color::White))
-        .wrap(ratatui::widgets::Wrap { trim: false });
+    let header = Row::new(vec!["NAME","VERSION","CATEGORY","STATUS","DESCRIPTION"])
+        .style(Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)).height(1);
 
-    f.render_widget(editor, chunks[0]);
-
-    let status = format!(
-        "Ln {} Col {} | Ctrl+S:Save Esc:Close",
-        app.editor_cursor_y + 1,
-        app.editor_cursor_x + 1
-    );
-
-    let status_bar = Paragraph::new(status)
-        .style(Style::default().fg(Color::DarkGray).bg(Color::Black));
-
-    f.render_widget(status_bar, chunks[1]);
-}
-
-fn draw_marketplace(f: &mut Frame, app: &App, area: Rect) {
-    let header = Row::new(vec![
-        Cell::from("NAME"),
-        Cell::from("VERSION"),
-        Cell::from("CATEGORY"),
-        Cell::from("STATUS"),
-        Cell::from("DESCRIPTION"),
-    ])
-    .style(Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD))
-    .height(1);
-
-    let rows: Vec<Row> = app.marketplace.iter().enumerate().map(|(i, ext)| {
+    let rows: Vec<Row> = exts.iter().enumerate().skip(app.scroll_offset).map(|(i, ext)| {
         let style = if i == app.selected_index {
             Style::default().bg(Color::DarkGray).fg(Color::White)
-        } else {
-            Style::default().fg(Color::White)
-        };
-
+        } else { Style::default().fg(Color::White) };
         let status = if ext.built_in {
             Span::styled("Built-in", Style::default().fg(Color::Green))
         } else if ext.installed {
@@ -413,170 +249,131 @@ fn draw_marketplace(f: &mut Frame, app: &App, area: Rect) {
         } else {
             Span::styled("Available", Style::default().fg(Color::Yellow))
         };
-
         Row::new(vec![
             Cell::from(truncate(&ext.name, 16)),
             Cell::from(truncate(&ext.version, 8)),
             Cell::from(truncate(&ext.category, 10)),
             Cell::from(status),
             Cell::from(truncate(&ext.description, 30)),
-        ])
-        .style(style)
-        .height(1)
+        ]).style(style).height(1)
     }).collect();
 
-    let table = Table::new(
-        rows,
-        [
-            Constraint::Length(17),
-            Constraint::Length(9),
-            Constraint::Length(11),
-            Constraint::Length(11),
-            Constraint::Min(31),
-        ],
-    )
-    .header(header)
-    .block(Block::default()
-        .borders(Borders::ALL)
-        .title(format!("Extensions ({})", app.marketplace.len())));
-
+    let table = Table::new(rows, [
+        Constraint::Length(17), Constraint::Length(9), Constraint::Length(11),
+        Constraint::Length(11), Constraint::Min(31),
+    ]).header(header)
+    .block(Block::default().borders(Borders::ALL)
+        .title(format!(" Extensions ({}) ", exts.len())));
     f.render_widget(table, area);
 }
 
 fn draw_logs(f: &mut Frame, app: &App, area: Rect) {
-    let logs: Vec<Line> = app.logs.iter().map(|l| {
+    let logs: Vec<Line> = app.logs.iter().skip(app.scroll_offset).map(|l| {
         Line::from(Span::styled(truncate(l, 120), Style::default().fg(Color::White)))
     }).collect();
-
-    let paragraph = Paragraph::new(logs)
-        .block(Block::default()
-            .borders(Borders::ALL)
-            .title("Logs"))
+    let para = Paragraph::new(logs)
+        .block(Block::default().borders(Borders::ALL).title(" Logs "))
         .wrap(ratatui::widgets::Wrap { trim: true });
-
-    f.render_widget(paragraph, area);
+    f.render_widget(para, area);
 }
 
 fn draw_footer(f: &mut Frame, app: &App, area: Rect) {
     let help_text = match app.mode {
-        AppMode::Normal => {
-            match app.active_tab {
-                super::app::ActiveTab::Marketplace => "q:Quit Tab:Switch u:Uninstall r:Refresh h:Help",
-                super::app::ActiveTab::Containers => "q:Quit Tab:Switch Enter:Files r:Refresh h:Help",
-                _ => "q:Quit Tab:Switch r:Refresh h:Help",
-            }
+        AppMode::Normal => match app.active_tab {
+            ActiveTab::Containers => "n:New ENTER:Action [sxdiw]:Keys Tab:Switch r:Refresh h:Help q:Quit",
+            ActiveTab::Images => "p:Pull Tab:Switch r:Refresh h:Help q:Quit",
+            ActiveTab::Extensions => "i:Install e:Enable d:Disable u:Uninstall ENTER:Action [ieDu]:Keys Tab:Switch r:Refresh h:Help q:Quit",
+            _ => "Tab:Switch r:Refresh h:Help q:Quit",
         },
-        AppMode::ContainerFiles => "q:Back Enter:Open d:Delete n:New m:Mkdir Esc:Exit",
-        AppMode::FileEditor => "Ctrl+S:Save Esc:Close",
-        AppMode::CommandInput => "Enter:Confirm Esc:Cancel",
-        AppMode::ConfirmDelete => "y:Yes n:No",
+        AppMode::ConfirmDelete => "y:Yes n:No Esc:Cancel",
+        AppMode::NewContainer => "Tab:NextField Enter:Create Esc:Cancel",
+        AppMode::ExecCommand => "Enter:Run Esc:Cancel",
+        AppMode::ImagePull => "Enter:Pull Esc:Cancel",
+        AppMode::WatchingLogs => "Esc/q:Stop r:Refresh g/G:Scroll",
     };
-
     let status = truncate(&app.status_message, 50);
-
     let footer = Paragraph::new(Line::from(vec![
         Span::styled(status, Style::default().fg(Color::Yellow)),
         Span::raw(" | "),
         Span::styled(help_text, Style::default().fg(Color::Gray)),
     ]))
     .block(Block::default().borders(Borders::ALL));
-
     f.render_widget(footer, area);
 }
 
 fn draw_confirm_popup(f: &mut Frame, app: &App) {
-    let area = centered_rect(40, 20, f.area());
-
+    let area = centered_rect(40, 15, f.area());
     let text = vec![
-        Line::from(Span::styled(
-            truncate(&app.confirm_message, 30),
-            Style::default().fg(Color::Red).add_modifier(Modifier::BOLD),
-        )),
+        Line::from(Span::styled(truncate(&app.confirm_message, 30),
+            Style::default().fg(Color::Red).add_modifier(Modifier::BOLD))),
         Line::from(""),
-        Line::from(Span::styled(
-            "y = Yes, n = No",
-            Style::default().fg(Color::Gray),
-        )),
+        Line::from(Span::styled("y = Yes, n = No, Esc = Cancel", Style::default().fg(Color::Gray))),
     ];
-
     let popup = Paragraph::new(text)
-        .block(Block::default()
-            .borders(Borders::ALL)
-            .title("Confirm")
+        .block(Block::default().borders(Borders::ALL).title("Confirm")
             .style(Style::default().bg(Color::DarkGray)))
         .alignment(ratatui::layout::Alignment::Center);
-
     f.render_widget(Clear, area);
     f.render_widget(popup, area);
 }
 
-fn draw_command_popup(f: &mut Frame, app: &App) {
-    let area = centered_rect(50, 15, f.area());
-
+fn draw_new_container_popup(f: &mut Frame, app: &App) {
+    let area = centered_rect(50, 20, f.area());
     let text = vec![
-        Line::from(Span::styled(
-            truncate(&app.status_message, 40),
-            Style::default().fg(Color::Yellow),
-        )),
+        Line::from(Span::styled("Create New Container", Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD))),
         Line::from(""),
-        Line::from(vec![
-            Span::styled("> ", Style::default().fg(Color::Cyan)),
-            Span::styled(truncate(&app.command_input, 30), Style::default().fg(Color::White)),
-            Span::styled("_", Style::default().fg(Color::White).add_modifier(Modifier::SLOW_BLINK)),
-        ]),
+        Line::from(vec![Span::styled("Name:     ", Style::default().fg(Color::Yellow)), Span::styled(&app.new_name, Style::default().fg(Color::White))]),
+        Line::from(vec![Span::styled("Image:    ", Style::default().fg(Color::Yellow)), Span::styled(&app.new_image, Style::default().fg(Color::White))]),
+        Line::from(vec![Span::styled("Command:  ", Style::default().fg(Color::Yellow)), Span::styled(&app.new_cmd, Style::default().fg(Color::White))]),
+        Line::from(""),
+        Line::from(Span::styled("Tab: switch field | Enter: create | Esc: cancel", Style::default().fg(Color::Gray))),
     ];
-
     let popup = Paragraph::new(text)
-        .block(Block::default()
-            .borders(Borders::ALL)
-            .title("Input")
+        .block(Block::default().borders(Borders::ALL).title("New Container")
             .style(Style::default().bg(Color::DarkGray)));
+    f.render_widget(Clear, area);
+    f.render_widget(popup, area);
+}
 
+fn draw_pull_image_popup(f: &mut Frame, app: &App) {
+    let area = centered_rect(40, 10, f.area());
+    let text = vec![
+        Line::from(Span::styled("Pull Image", Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD))),
+        Line::from(""),
+        Line::from(vec![Span::styled("Image: ", Style::default().fg(Color::Yellow)), Span::styled(&app.pull_input, Style::default().fg(Color::White))]),
+        Line::from(""),
+        Line::from(Span::styled("Enter: pull | Esc: cancel", Style::default().fg(Color::Gray))),
+    ];
+    let popup = Paragraph::new(text)
+        .block(Block::default().borders(Borders::ALL).title("Pull Image")
+            .style(Style::default().bg(Color::DarkGray)));
     f.render_widget(Clear, area);
     f.render_widget(popup, area);
 }
 
 fn draw_help_popup(f: &mut Frame) {
-    let area = centered_rect(50, 50, f.area());
-
-    let help_text = vec![
-        Line::from(Span::styled("Qcker TUI Help", Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD))),
+    let area = centered_rect(60, 55, f.area());
+    let popup = Paragraph::new(vec![
+        Line::from(Span::styled("Qcker Dashboard v0.1.0", Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD))),
         Line::from(""),
-        Line::from(Span::styled("Navigation:", Style::default().fg(Color::Yellow))),
-        Line::from("  Tab        Switch tabs"),
-        Line::from("  Up/Down    Navigate"),
+        Line::from("  Tab/BackTab  Switch tabs (7 tabs)"),
+        Line::from("  j/k or arrows  Navigate lists"),
+        Line::from("  Enter  Select / Execute action"),
+        Line::from("  Left/Right  Move action focus (Containers tab)"),
+        Line::from("  Containers: n:s:x:d:i:w  Extensions: i:e:d:u"),
+        Line::from("  p  Pull image   ←→  Move action focus   Enter  Execute"),
+        Line::from("  r  Refresh   h  Toggle help   q  Quit"),
         Line::from(""),
-        Line::from(Span::styled("Containers:", Style::default().fg(Color::Yellow))),
-        Line::from("  Enter      Browse files"),
-        Line::from(""),
-        Line::from(Span::styled("Files:", Style::default().fg(Color::Yellow))),
-        Line::from("  Enter      Open"),
-        Line::from("  e          Edit"),
-        Line::from("  d          Delete"),
-        Line::from("  n          New file"),
-        Line::from("  m          New dir"),
-        Line::from(""),
-        Line::from(Span::styled("Extensions:", Style::default().fg(Color::Yellow))),
-        Line::from("  u/Enter    Uninstall"),
-        Line::from(""),
-        Line::from(Span::styled("General:", Style::default().fg(Color::Yellow))),
-        Line::from("  r          Refresh"),
-        Line::from("  h          Help"),
-        Line::from("  q          Quit"),
-    ];
-
-    let help = Paragraph::new(help_text)
-        .block(Block::default()
-            .borders(Borders::ALL)
-            .title("Help")
-            .style(Style::default().bg(Color::DarkGray)));
-
+        Line::from(Span::styled("Mouse: Click tabs, rows, buttons, scroll wheel", Style::default().fg(Color::Gray))),
+    ])
+    .block(Block::default().borders(Borders::ALL).title("Help"))
+    .style(Style::default().bg(Color::DarkGray));
     f.render_widget(Clear, area);
-    f.render_widget(help, area);
+    f.render_widget(popup, area);
 }
 
 fn centered_rect(percent_x: u16, percent_y: u16, r: Rect) -> Rect {
-    let popup_layout = Layout::default()
+    let pl = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
             Constraint::Percentage((100 - percent_y) / 2),
@@ -584,7 +381,6 @@ fn centered_rect(percent_x: u16, percent_y: u16, r: Rect) -> Rect {
             Constraint::Percentage((100 - percent_y) / 2),
         ])
         .split(r);
-
     Layout::default()
         .direction(Direction::Horizontal)
         .constraints([
@@ -592,25 +388,10 @@ fn centered_rect(percent_x: u16, percent_y: u16, r: Rect) -> Rect {
             Constraint::Percentage(percent_x),
             Constraint::Percentage((100 - percent_x) / 2),
         ])
-        .split(popup_layout[1])[1]
+        .split(pl[1])[1]
 }
 
 fn truncate(s: &str, max_len: usize) -> String {
-    if s.chars().count() <= max_len {
-        s.to_string()
-    } else {
-        format!("{}...", s.chars().take(max_len.saturating_sub(3)).collect::<String>())
-    }
-}
-
-fn format_size(size: u64) -> String {
-    if size < 1024 {
-        format!("{} B", size)
-    } else if size < 1024 * 1024 {
-        format!("{:.1} KB", size as f64 / 1024.0)
-    } else if size < 1024 * 1024 * 1024 {
-        format!("{:.1} MB", size as f64 / (1024.0 * 1024.0))
-    } else {
-        format!("{:.1} GB", size as f64 / (1024.0 * 1024.0 * 1024.0))
-    }
+    if s.chars().count() <= max_len { s.to_string() }
+    else { format!("{}...", s.chars().take(max_len.saturating_sub(3)).collect::<String>()) }
 }

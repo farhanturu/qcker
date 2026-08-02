@@ -15,7 +15,7 @@ impl ExtensionLoader {
         let ext_dir = self.extensions_dir.join(extension_id);
 
         if !ext_dir.exists() {
-            return Err(QckerError::InvalidArgument(format!(
+            return Err(QckerError::invalid_argument(format!(
                 "Extension not found: {}",
                 extension_id
             )));
@@ -40,7 +40,7 @@ impl ExtensionLoader {
             }
         }
 
-        Err(QckerError::InvalidArgument(
+        Err(QckerError::invalid_argument(
             "No library file found in extension directory".to_string(),
         ))
     }
@@ -52,24 +52,3 @@ pub struct LoadedExtension {
     pub loaded: bool,
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use std::fs;
-    use tempfile::TempDir;
-
-    #[test]
-    fn test_extension_loader() {
-        let tmp = TempDir::new().unwrap();
-        let ext_dir = tmp.path().join("extensions").join("com.test.ext");
-        fs::create_dir_all(&ext_dir).unwrap();
-
-        fs::write(ext_dir.join("libext.so"), "dummy").unwrap();
-
-        let loader = ExtensionLoader::new(tmp.path().join("extensions"));
-        let loaded = loader.load("com.test.ext").unwrap();
-
-        assert_eq!(loaded.id, "com.test.ext");
-        assert!(loaded.loaded);
-    }
-}

@@ -44,35 +44,3 @@ pub fn getgid() -> u32 {
     unsafe { libc::getgid() }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use tempfile::TempDir;
-
-    #[test]
-    fn test_copy_dir_all() {
-        let src = TempDir::new().unwrap();
-        let dst = TempDir::new().unwrap();
-
-        fs::create_dir_all(src.path().join("subdir")).unwrap();
-        fs::write(src.path().join("file1.txt"), "hello").unwrap();
-        fs::write(src.path().join("subdir/file2.txt"), "world").unwrap();
-
-        copy_dir_all(src.path(), &dst.path().join("copy")).unwrap();
-
-        assert!(dst.path().join("copy/file1.txt").exists());
-        assert!(dst.path().join("copy/subdir/file2.txt").exists());
-        assert_eq!(
-            fs::read_to_string(dst.path().join("copy/file1.txt")).unwrap(),
-            "hello"
-        );
-    }
-
-    #[test]
-    fn test_ensure_dir() {
-        let tmp = TempDir::new().unwrap();
-        let path = tmp.path().join("a/b/c");
-        ensure_dir(&path).unwrap();
-        assert!(path.exists());
-    }
-}

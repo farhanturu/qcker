@@ -50,7 +50,7 @@ pub enum Protocol {
     Udp,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct ResourceSpec {
     pub cpu_shares: Option<u64>,
     pub memory_mb: Option<u64>,

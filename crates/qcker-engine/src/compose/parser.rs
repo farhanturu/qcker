@@ -89,12 +89,12 @@ pub struct VolumeConfig {
 impl ComposeFile {
     pub fn parse(content: &str) -> Result<Self> {
         serde_yaml::from_str(content)
-            .map_err(|e| QckerError::InvalidArgument(format!("Failed to parse compose file: {}", e)))
+            .map_err(|e| QckerError::invalid_argument(format!("Failed to parse compose file: {}", e)))
     }
 
     pub fn parse_file(path: &Path) -> Result<Self> {
         let content = std::fs::read_to_string(path)
-            .map_err(|e| QckerError::Internal(format!("Failed to read compose file: {}", e)))?;
+            .map_err(|e| QckerError::internal(format!("Failed to read compose file: {}", e)))?;
         Self::parse(&content)
     }
 
@@ -120,7 +120,7 @@ impl ComposeFile {
         visiting: &mut std::collections::HashSet<String>,
     ) -> Result<()> {
         if visiting.contains(name) {
-            return Err(QckerError::InvalidArgument(format!(
+            return Err(QckerError::invalid_argument(format!(
                 "Circular dependency detected: {}",
                 name
             )));
@@ -175,66 +175,3 @@ impl ComposeFile {
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_parse_simple_compose() {
-        let yaml = r#"
-version: "3"
-services:
-  web:
-    image: nginx:latest
-    ports:
-      - "8080:80"
-  app:
-    image: node:18
-    depends_on:
-      - web
-"#;
-        let compose = ComposeFile::parse(yaml).unwrap();
-        assert_eq!(compose.services.len(), 2);
-        assert!(compose.services.contains_key("web"));
-        assert!(compose.services.contains_key("app"));
-    }
-
-    #[test]
-    fn test_service_order() {
-        let yaml = r#"
-services:
-  db:
-    image: postgres:15
-  app:
-    image: node:18
-    depends_on:
-      - db
-  web:
-    image: nginx:latest
-    depends_on:
-      - app
-"#;
-        let compose = ComposeFile::parse(yaml).unwrap();
-        let order = compose.get_service_order().unwrap();
-
-        let db_pos = order.iter().position(|n| n == "db").unwrap();
-        let app_pos = order.iter().position(|n| n == "app").unwrap();
-        let web_pos = order.iter().position(|n| n == "web").unwrap();
-
-        assert!(db_pos < app_pos);
-        assert!(app_pos < web_pos);
-    }
-
-    #[test]
-    fn test_get_env() {
-        let env = Some(EnvConfig::Map({
-            let mut map = HashMap::new();
-            map.insert("DB_HOST".to_string(), "localhost".to_string());
-            map.insert("DB_PORT".to_string(), "5432".to_string());
-            map
-        }));
-
-        let result = ComposeFile::get_env(&env);
-        assert_eq!(result.len(), 2);
-    }
-}

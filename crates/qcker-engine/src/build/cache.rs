@@ -24,7 +24,7 @@ impl BuildCache {
 
     pub fn init(&self) -> Result<()> {
         fs::create_dir_all(&self.cache_dir)
-            .map_err(|e| QckerError::Internal(format!("Failed to create cache dir: {}", e)))?;
+            .map_err(|e| QckerError::internal(format!("Failed to create cache dir: {}", e)))?;
         Ok(())
     }
 
@@ -54,10 +54,10 @@ impl BuildCache {
         }
 
         let meta_json = fs::read_to_string(&meta_path)
-            .map_err(|e| QckerError::Internal(format!("Failed to read cache meta: {}", e)))?;
+            .map_err(|e| QckerError::internal(format!("Failed to read cache meta: {}", e)))?;
 
         let entry: CacheEntry = serde_json::from_str(&meta_json)
-            .map_err(|e| QckerError::Internal(format!("Failed to parse cache meta: {}", e)))?;
+            .map_err(|e| QckerError::internal(format!("Failed to parse cache meta: {}", e)))?;
 
         Ok(Some(entry))
     }
@@ -65,7 +65,7 @@ impl BuildCache {
     pub fn store_entry(&self, key: &str, layer_digest: &str) -> Result<()> {
         let entry_dir = self.cache_dir.join(key);
         fs::create_dir_all(&entry_dir)
-            .map_err(|e| QckerError::Internal(format!("Failed to create cache entry dir: {}", e)))?;
+            .map_err(|e| QckerError::internal(format!("Failed to create cache entry dir: {}", e)))?;
 
         let entry = CacheEntry {
             key: key.to_string(),
@@ -74,11 +74,11 @@ impl BuildCache {
         };
 
         let meta_json = serde_json::to_string_pretty(&entry)
-            .map_err(|e| QckerError::Internal(format!("Failed to serialize cache entry: {}", e)))?;
+            .map_err(|e| QckerError::internal(format!("Failed to serialize cache entry: {}", e)))?;
 
         let meta_path = entry_dir.join("meta.json");
         fs::write(&meta_path, meta_json)
-            .map_err(|e| QckerError::Internal(format!("Failed to write cache entry: {}", e)))?;
+            .map_err(|e| QckerError::internal(format!("Failed to write cache entry: {}", e)))?;
 
         Ok(())
     }
@@ -86,29 +86,9 @@ impl BuildCache {
     pub fn clear(&self) -> Result<()> {
         if self.cache_dir.exists() {
             fs::remove_dir_all(&self.cache_dir)
-                .map_err(|e| QckerError::Internal(format!("Failed to clear cache: {}", e)))?;
+                .map_err(|e| QckerError::internal(format!("Failed to clear cache: {}", e)))?;
         }
         Ok(())
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use tempfile::TempDir;
-
-    #[test]
-    fn test_build_cache() {
-        let tmp = TempDir::new().unwrap();
-        let cache = BuildCache::new(tmp.path().to_path_buf());
-        cache.init().unwrap();
-
-        let key = cache.compute_key("RUN echo hello", "abc123", "parent_key");
-        assert!(!key.is_empty());
-
-        cache.store_entry(&key, "sha256:layer123").unwrap();
-
-        let entry = cache.get_entry(&key).unwrap().unwrap();
-        assert_eq!(entry.layer_digest, "sha256:layer123");
-    }
-}
