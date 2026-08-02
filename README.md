@@ -11,9 +11,7 @@
 <p align="center">
   <a href="https://opensource.org/licenses/Apache-2.0"><img src="https://img.shields.io/badge/License-Apache_2.0-blue.svg" alt="License"></a>
   <a href="https://www.rust-lang.org/"><img src="https://img.shields.io/badge/Rust-1.70%2B-orange.svg" alt="Rust"></a>
-  <a href="#"><img src="https://img.shields.io/badge/tests-50%20passed-brightgreen.svg" alt="Tests"></a>
   <a href="#"><img src="https://img.shields.io/badge/Docker-alternative-blue.svg" alt="Docker Alternative"></a>
-  <a href="#"><img src="https://img.shields.io/badge/OCI-compliant-green.svg" alt="OCI Compliant"></a>
 </p>
 
 <p align="center">
@@ -34,86 +32,7 @@
   <img src="tui-demo.png" alt="Qcker TUI Demo" width="800">
 </p>
 
-The TUI provides a visual dashboard for managing containers, browsing files, editing configs, and managing extensions.
-
----
-
-## Benchmarks
-
-### Container Startup Time
-
-<p align="center">
-  <img src="benchmark-chart.png" alt="Container Startup Benchmark" width="700">
-</p>
-
-| Metric | Docker | Qcker | Improvement |
-|--------|--------|-------|-------------|
-| Cold start | ~1200ms | **63ms** | 19x faster |
-| Warm start | ~200ms | **16ms** | 12x faster |
-| Container create | ~800ms | **45ms** | 18x faster |
-| Container stop | ~300ms | **12ms** | 25x faster |
-
-### Binary Size
-
-<p align="center">
-  <img src="binary-size-chart.png" alt="Binary Size Comparison" width="600">
-</p>
-
-| Tool | Size |
-|------|------|
-| Docker Desktop | ~200 MB |
-| Podman | ~100 MB |
-| Colima | ~50 MB |
-| **Qcker** | **7.7 MB** |
-
-Qcker is 26x smaller than Docker Desktop.
-
-### Memory Usage
-
-| Scenario | Docker | Qcker |
-|----------|--------|-------|
-| Idle (no containers) | 150+ MB | **0 MB** |
-| 1 container | 160+ MB | **5 MB** |
-| 10 containers | 250+ MB | **50 MB** |
-
----
-
-## Why Qcker over Docker?
-
-| | Docker | Qcker |
-|---|---|---|
-| **Binary size** | ~200 MB | **~7 MB** |
-| **Daemon memory** | 100-300 MB | **0 MB (no daemon)** |
-| **Container startup** | ~1.2s | **<200ms** |
-| **Rootless by default** | No | **Yes** |
-| **Language** | Go | **Rust** |
-| **TUI built-in** | No | **Yes** |
-| **GPU support** | Manual | **Built-in flag** |
-| **Extension system** | Limited | **Full SDK** |
-| **Error handling** | Generic | **Error codes + suggestions** |
-
----
-
-## MicroVM Support
-
-Qcker includes a MicroVM backend for running containers on macOS and Windows without a full Docker Desktop installation.
-
-**How it works:**
-- On Linux: Uses native namespaces and cgroups (no VM needed)
-- On macOS/Windows: Spawns a minimal MicroVM via QEMU
-- The MicroVM runs qcker-runtime as PID 1 (init process)
-- Communication via vsock (zero-overhead kernel channel)
-- Single VM shared by all containers (not per-container)
-- Auto-shutdown after idle timeout
-
-**MicroVM vs Docker Desktop:**
-
-| | Docker Desktop | Qcker MicroVM |
-|---|---|---|
-| Install size | ~1.5 GB | **~7 MB** |
-| RAM idle | 500+ MB | **~30 MB** |
-| Boot time | 10-30s | **<200ms** |
-| Full Linux distro | Yes | **No** |
+The TUI provides a visual dashboard for managing containers, browsing files, editing configs, and managing extensions with mouse support and auto-refresh.
 
 ---
 
@@ -174,9 +93,11 @@ sudo ./target/release/qcker run --rootfs /path/to/rootfs \
 ### Security
 - Rootless by default
 - PID, network, mount, UTS, IPC, cgroup namespace isolation
-- Seccomp syscall filtering (31 blocked syscalls)
+- Seccomp syscall filtering (BPF-based)
 - Capability dropping (all caps removed by default)
-- Read-only rootfs option
+- pivot_root container isolation (not chroot)
+- Path traversal protection in tar extraction
+- Cryptographic ID generation with getrandom
 
 ### Error Handling
 - Unique error codes (Q-C001, Q-I001, etc.)
@@ -186,12 +107,14 @@ sudo ./target/release/qcker run --rootfs /path/to/rootfs \
 - Retryable error detection
 
 ### TUI (Terminal UI)
-- 8 tabs: Containers, Images, Networks, Volumes, Stats, Logs, Extensions, Marketplace
+- 7 tabs: Containers, Images, Networks, Volumes, Stats, Logs, Extensions
 - Browse and edit files inside containers
 - Real-time stats with CPU/memory bars
-- Theme system (dark, dracula)
-- Mouse support
+- Dracula-inspired dark theme
+- Mouse support (click, scroll)
 - Auto-refresh
+- Container actions (stop, kill, delete) from TUI
+- Vim-style navigation (j/k)
 
 ### Docker-Compatible CLI
 - `qcker run`, `qcker ps`, `qcker images`, `qcker build`, `qcker exec`
@@ -252,9 +175,23 @@ Backend selection is automatic based on platform.
 
 ---
 
+## MicroVM Support
+
+Qcker includes a MicroVM backend for running containers on macOS and Windows without a full Docker Desktop installation.
+
+**How it works:**
+- On Linux: Uses native namespaces and cgroups (no VM needed)
+- On macOS/Windows: Spawns a minimal MicroVM via QEMU
+- The MicroVM runs qcker-runtime as PID 1 (init process)
+- Communication via vsock (zero-overhead kernel channel)
+- Single VM shared by all containers (not per-container)
+- Auto-shutdown after idle timeout
+
+---
+
 ## Extensions
 
-Browse and manage extensions in the TUI Marketplace tab.
+Browse and manage extensions in the TUI Extensions tab.
 
 | Extension | Category | Status |
 |-----------|----------|--------|
@@ -277,7 +214,7 @@ Request new extensions: https://github.com/farhanturu/qcker-extensions/issues
 | Daemon | Yes | No | No |
 | Rootless | Optional | Yes | Yes |
 | Language | Go | Go | Rust |
-| Binary size | 200 MB | 100 MB | 7.5 MB |
+| Binary size | 200 MB | 100 MB | ~7 MB |
 | TUI | No | No | Yes |
 | GPU support | Manual | Manual | Built-in |
 | Extensions | Limited | Limited | Full SDK |
@@ -315,9 +252,3 @@ Apache License 2.0 - see [LICENSE](LICENSE)
 **PaongLabs**
 - GitHub: https://github.com/farhanturu
 - Email: paongtech@gmail.com
-
----
-
-## Tags
-
-docker, docker-alternative, container, container-engine, container-runtime, rust, oci, rootless, daemonless, linux, namespaces, cgroups, podman, podman-alternative, kubernetes, k8s, devops, gpu, tui, microvm, qemu, virtualization, docker-desktop-alternative, lightweight-containers, fast-containers, container-tools, docker-replacement

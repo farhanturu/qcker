@@ -6,10 +6,35 @@ pub enum ActiveTab {
     Images,
     Networks,
     Volumes,
-    Files,
-    Editor,
-    Marketplace,
+    Stats,
     Logs,
+    Marketplace,
+}
+
+impl ActiveTab {
+    pub fn title(&self) -> &'static str {
+        match self {
+            ActiveTab::Containers => "Containers",
+            ActiveTab::Images => "Images",
+            ActiveTab::Networks => "Networks",
+            ActiveTab::Volumes => "Volumes",
+            ActiveTab::Stats => "Stats",
+            ActiveTab::Logs => "Logs",
+            ActiveTab::Marketplace => "Extensions",
+        }
+    }
+
+    pub fn all() -> Vec<ActiveTab> {
+        vec![
+            ActiveTab::Containers,
+            ActiveTab::Images,
+            ActiveTab::Networks,
+            ActiveTab::Volumes,
+            ActiveTab::Stats,
+            ActiveTab::Logs,
+            ActiveTab::Marketplace,
+        ]
+    }
 }
 
 #[derive(Clone, PartialEq)]
@@ -18,7 +43,7 @@ pub enum AppMode {
     ContainerFiles,
     FileEditor,
     CommandInput,
-    ConfirmDelete,
+    ConfirmAction,
 }
 
 pub struct App {
@@ -30,8 +55,9 @@ pub struct App {
     pub volumes: Vec<VolumeInfo>,
     pub files: Vec<FileInfo>,
     pub marketplace: Vec<MarketplaceExtension>,
-    pub logs: Vec<String>,
+    pub logs: Vec<LogEntry>,
     pub selected_index: usize,
+    pub scroll_offset: usize,
     pub show_help: bool,
     pub data_dir: PathBuf,
     pub should_quit: bool,
@@ -42,16 +68,21 @@ pub struct App {
     pub editor_cursor_x: usize,
     pub editor_cursor_y: usize,
     pub editor_modified: bool,
+    pub editor_file_path: Option<String>,
     pub command_input: String,
     pub confirm_message: String,
     pub confirm_action: Option<ConfirmAction>,
+    pub last_refresh: String,
+    pub auto_refresh: bool,
+    pub stats: Vec<ContainerStats>,
 }
 
 #[derive(Clone)]
 pub enum ConfirmAction {
     DeleteFile(String),
-    DeleteContainer(String),
     StopContainer(String),
+    KillContainer(String),
+    DeleteContainer(String),
     UninstallExtension(String),
 }
 
@@ -104,10 +135,30 @@ pub struct MarketplaceExtension {
     pub name: String,
     pub version: String,
     pub description: String,
-    pub author: String,
     pub category: String,
     pub built_in: bool,
     pub installed: bool,
+}
+
+#[derive(Clone)]
+pub struct LogEntry {
+    pub timestamp: String,
+    pub level: String,
+    pub message: String,
+}
+
+#[derive(Clone)]
+pub struct ContainerStats {
+    pub id: String,
+    pub name: String,
+    pub cpu_percent: f64,
+    pub memory_mb: f64,
+    pub memory_limit_mb: f64,
+    pub pids: u32,
+    pub net_rx: u64,
+    pub net_tx: u64,
+    pub block_rx: u64,
+    pub block_tx: u64,
 }
 
 impl App {
@@ -123,6 +174,7 @@ impl App {
             marketplace: Vec::new(),
             logs: Vec::new(),
             selected_index: 0,
+            scroll_offset: 0,
             show_help: false,
             data_dir,
             should_quit: false,
@@ -133,9 +185,13 @@ impl App {
             editor_cursor_x: 0,
             editor_cursor_y: 0,
             editor_modified: false,
+            editor_file_path: None,
             command_input: String::new(),
             confirm_message: String::new(),
             confirm_action: None,
+            last_refresh: String::new(),
+            auto_refresh: true,
+            stats: Vec::new(),
         }
     }
 
@@ -145,10 +201,25 @@ impl App {
         self.networks = self.load_networks();
         self.volumes = self.load_volumes();
         self.marketplace = self.load_marketplace();
+        self.stats = self.load_stats();
+        self.load_logs();
         if self.mode == AppMode::ContainerFiles {
             self.files = self.load_files();
         }
-        self.status_message = format!("Refreshed at {}", chrono::Local::now().format("%H:%M:%S"));
+        self.last_refresh = chrono::Local::now().format("%H:%M:%S").to_string();
+        self.status_message = format!("Refreshed at {}", self.last_refresh);
+    }
+
+    pub fn item_count(&self) -> usize {
+        match self.active_tab {
+            ActiveTab::Containers => self.containers.len(),
+            ActiveTab::Images => self.images.len(),
+            ActiveTab::Networks => self.networks.len(),
+            ActiveTab::Volumes => self.volumes.len(),
+            ActiveTab::Stats => self.stats.len(),
+            ActiveTab::Logs => self.logs.len(),
+            ActiveTab::Marketplace => self.marketplace.len(),
+        }
     }
 
     fn load_marketplace(&self) -> Vec<MarketplaceExtension> {
@@ -172,7 +243,6 @@ impl App {
                 name: "Bridge Network".to_string(),
                 version: "1.0.0".to_string(),
                 description: "Default bridge networking".to_string(),
-                author: "Qcker".to_string(),
                 category: "network".to_string(),
                 built_in: true,
                 installed: true,
@@ -182,7 +252,6 @@ impl App {
                 name: "OverlayFS Storage".to_string(),
                 version: "1.0.0".to_string(),
                 description: "Default overlayfs storage".to_string(),
-                author: "Qcker".to_string(),
                 category: "storage".to_string(),
                 built_in: true,
                 installed: true,
@@ -192,7 +261,6 @@ impl App {
                 name: "Trivy Scanner".to_string(),
                 version: "1.0.0".to_string(),
                 description: "Vulnerability scanning".to_string(),
-                author: "Qcker".to_string(),
                 category: "security".to_string(),
                 built_in: false,
                 installed: installed.iter().any(|i| i.contains("trivy")),
@@ -202,7 +270,6 @@ impl App {
                 name: "Cilium Network".to_string(),
                 version: "1.0.0".to_string(),
                 description: "eBPF networking".to_string(),
-                author: "Qcker".to_string(),
                 category: "network".to_string(),
                 built_in: false,
                 installed: installed.iter().any(|i| i.contains("cilium")),
@@ -212,7 +279,6 @@ impl App {
                 name: "ZFS Storage".to_string(),
                 version: "1.0.0".to_string(),
                 description: "ZFS storage backend".to_string(),
-                author: "Qcker".to_string(),
                 category: "storage".to_string(),
                 built_in: false,
                 installed: installed.iter().any(|i| i.contains("zfs")),
@@ -222,7 +288,6 @@ impl App {
                 name: "Loki Logger".to_string(),
                 version: "1.0.0".to_string(),
                 description: "Grafana Loki logging".to_string(),
-                author: "Qcker".to_string(),
                 category: "logging".to_string(),
                 built_in: false,
                 installed: installed.iter().any(|i| i.contains("loki")),
@@ -232,7 +297,6 @@ impl App {
                 name: "BuildKit Builder".to_string(),
                 version: "1.0.0".to_string(),
                 description: "BuildKit compatible builder".to_string(),
-                author: "Qcker".to_string(),
                 category: "build".to_string(),
                 built_in: false,
                 installed: installed.iter().any(|i| i.contains("buildkit")),
@@ -309,7 +373,7 @@ impl App {
     }
 
     fn load_networks(&self) -> Vec<NetworkInfo> {
-        vec![
+        let mut networks = vec![
             NetworkInfo {
                 id: "host".to_string(),
                 name: "host".to_string(),
@@ -322,7 +386,27 @@ impl App {
                 driver: "none".to_string(),
                 subnet: "-".to_string(),
             },
-        ]
+        ];
+
+        let networks_dir = self.data_dir.join("networks");
+        if networks_dir.exists() {
+            if let Ok(entries) = std::fs::read_dir(&networks_dir) {
+                for entry in entries.flatten() {
+                    let config_path = entry.path().join("config.json");
+                    if let Ok(content) = std::fs::read_to_string(&config_path) {
+                        if let Ok(config) = serde_json::from_str::<serde_json::Value>(&content) {
+                            networks.push(NetworkInfo {
+                                id: config["id"].as_str().unwrap_or("unknown").to_string(),
+                                name: config["name"].as_str().unwrap_or("unknown").to_string(),
+                                driver: config["driver"].as_str().unwrap_or("bridge").to_string(),
+                                subnet: config["subnet"].as_str().unwrap_or("-").to_string(),
+                            });
+                        }
+                    }
+                }
+            }
+        }
+        networks
     }
 
     fn load_volumes(&self) -> Vec<VolumeInfo> {
@@ -347,6 +431,84 @@ impl App {
             }
         }
         volumes
+    }
+
+    fn load_stats(&self) -> Vec<ContainerStats> {
+        let containers_dir = self.data_dir.join("containers");
+        if !containers_dir.exists() {
+            return Vec::new();
+        }
+
+        let mut stats = Vec::new();
+        if let Ok(entries) = std::fs::read_dir(&containers_dir) {
+            for entry in entries.flatten() {
+                let state_path = entry.path().join("state.json");
+                if let Ok(content) = std::fs::read_to_string(&state_path) {
+                    if let Ok(state) = serde_json::from_str::<serde_json::Value>(&content) {
+                        let status = state["state"].as_str().unwrap_or("unknown");
+                        if status != "Running" {
+                            continue;
+                        }
+                        let id = state["id"].as_str().unwrap_or("unknown").to_string();
+                        let cpu = state["cpu_percent"].as_f64().unwrap_or(0.0);
+                        let mem = state["memory_mb"].as_f64().unwrap_or(0.0);
+                        let mem_limit = state["memory_limit_mb"].as_f64().unwrap_or(0.0);
+                        let pids = state["pids"].as_u64().unwrap_or(0) as u32;
+
+                        stats.push(ContainerStats {
+                            id: id.clone(),
+                            name: id,
+                            cpu_percent: cpu,
+                            memory_mb: mem,
+                            memory_limit_mb: mem_limit,
+                            pids,
+                            net_rx: state["net_rx"].as_u64().unwrap_or(0),
+                            net_tx: state["net_tx"].as_u64().unwrap_or(0),
+                            block_rx: state["block_rx"].as_u64().unwrap_or(0),
+                            block_tx: state["block_tx"].as_u64().unwrap_or(0),
+                        });
+                    }
+                }
+            }
+        }
+        stats
+    }
+
+    fn load_logs(&mut self) {
+        let logs_dir = self.data_dir.join("logs");
+        if !logs_dir.exists() {
+            return;
+        }
+
+        if let Ok(entries) = std::fs::read_dir(&logs_dir) {
+            for entry in entries.flatten() {
+                let path = entry.path();
+                if path.extension().map_or(false, |e| e == "log") {
+                    if let Ok(content) = std::fs::read_to_string(&path) {
+                        for line in content.lines().take(500) {
+                            let parts: Vec<&str> = line.splitn(3, ' ').collect();
+                            if parts.len() >= 3 {
+                                self.logs.push(LogEntry {
+                                    timestamp: parts[0].to_string(),
+                                    level: parts[1].to_string(),
+                                    message: parts[2].to_string(),
+                                });
+                            } else if !line.is_empty() {
+                                self.logs.push(LogEntry {
+                                    timestamp: "-".to_string(),
+                                    level: "INFO".to_string(),
+                                    message: line.to_string(),
+                                });
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        if self.logs.len() > 1000 {
+            self.logs = self.logs.split_off(self.logs.len() - 1000);
+        }
     }
 
     fn load_files(&self) -> Vec<FileInfo> {
@@ -405,66 +567,78 @@ impl App {
     }
 
     pub fn next_tab(&mut self) {
-        self.active_tab = match self.active_tab {
-            ActiveTab::Containers => ActiveTab::Images,
-            ActiveTab::Images => ActiveTab::Networks,
-            ActiveTab::Networks => ActiveTab::Volumes,
-            ActiveTab::Volumes => ActiveTab::Files,
-            ActiveTab::Files => ActiveTab::Editor,
-            ActiveTab::Editor => ActiveTab::Marketplace,
-            ActiveTab::Marketplace => ActiveTab::Logs,
-            ActiveTab::Logs => ActiveTab::Containers,
-        };
+        let tabs = ActiveTab::all();
+        if let Some(idx) = tabs.iter().position(|t| *t == self.active_tab) {
+            self.active_tab = tabs[(idx + 1) % tabs.len()].clone();
+        }
         self.selected_index = 0;
+        self.scroll_offset = 0;
     }
 
     pub fn prev_tab(&mut self) {
-        self.active_tab = match self.active_tab {
-            ActiveTab::Containers => ActiveTab::Logs,
-            ActiveTab::Images => ActiveTab::Containers,
-            ActiveTab::Networks => ActiveTab::Images,
-            ActiveTab::Volumes => ActiveTab::Networks,
-            ActiveTab::Files => ActiveTab::Volumes,
-            ActiveTab::Editor => ActiveTab::Files,
-            ActiveTab::Marketplace => ActiveTab::Editor,
-            ActiveTab::Logs => ActiveTab::Marketplace,
-        };
+        let tabs = ActiveTab::all();
+        if let Some(idx) = tabs.iter().position(|t| *t == self.active_tab) {
+            self.active_tab = tabs[(idx + tabs.len() - 1) % tabs.len()].clone();
+        }
         self.selected_index = 0;
+        self.scroll_offset = 0;
     }
 
     pub fn next_item(&mut self) {
-        let max = match self.active_tab {
-            ActiveTab::Containers => self.containers.len(),
-            ActiveTab::Images => self.images.len(),
-            ActiveTab::Networks => self.networks.len(),
-            ActiveTab::Volumes => self.volumes.len(),
-            ActiveTab::Files => self.files.len(),
-            ActiveTab::Editor => 0,
-            ActiveTab::Marketplace => self.marketplace.len(),
-            ActiveTab::Logs => self.logs.len(),
-        };
+        let max = self.item_count();
         if max > 0 {
             self.selected_index = (self.selected_index + 1) % max;
+            self.adjust_scroll(1);
         }
     }
 
     pub fn prev_item(&mut self) {
-        let max = match self.active_tab {
-            ActiveTab::Containers => self.containers.len(),
-            ActiveTab::Images => self.images.len(),
-            ActiveTab::Networks => self.networks.len(),
-            ActiveTab::Volumes => self.volumes.len(),
-            ActiveTab::Files => self.files.len(),
-            ActiveTab::Editor => 0,
-            ActiveTab::Marketplace => self.marketplace.len(),
-            ActiveTab::Logs => self.logs.len(),
-        };
+        let max = self.item_count();
         if max > 0 {
             self.selected_index = if self.selected_index == 0 {
                 max - 1
             } else {
                 self.selected_index - 1
             };
+            self.adjust_scroll(-1);
+        }
+    }
+
+    pub fn page_down(&mut self) {
+        let max = self.item_count();
+        if max > 0 {
+            self.selected_index = (self.selected_index + 10).min(max - 1);
+            self.scroll_offset = self.scroll_offset.saturating_add(10);
+        }
+    }
+
+    pub fn page_up(&mut self) {
+        self.selected_index = self.selected_index.saturating_sub(10);
+        self.scroll_offset = self.scroll_offset.saturating_sub(10);
+    }
+
+    fn adjust_scroll(&mut self, _direction: i32) {
+        let visible_rows = 20;
+        if self.selected_index < self.scroll_offset {
+            self.scroll_offset = self.selected_index;
+        } else if self.selected_index >= self.scroll_offset + visible_rows {
+            self.scroll_offset = self.selected_index - visible_rows + 1;
+        }
+    }
+
+    pub fn click_item(&mut self, row: usize) {
+        let max = self.item_count();
+        if max > 0 && row < max {
+            self.selected_index = row;
+        }
+    }
+
+    pub fn click_tab(&mut self, tab_index: usize) {
+        let tabs = ActiveTab::all();
+        if tab_index < tabs.len() {
+            self.active_tab = tabs[tab_index].clone();
+            self.selected_index = 0;
+            self.scroll_offset = 0;
         }
     }
 
@@ -482,10 +656,42 @@ impl App {
             self.selected_container = Some(container_id.clone());
             self.current_path = "/".to_string();
             self.mode = AppMode::ContainerFiles;
-            self.active_tab = ActiveTab::Files;
+            self.active_tab = ActiveTab::Containers;
             self.selected_index = 0;
+            self.scroll_offset = 0;
             self.files = self.load_files();
             self.status_message = format!("Browsing files in container {}", container_name);
+        }
+    }
+
+    pub fn stop_container(&mut self) {
+        let info = self.get_selected_container().cloned();
+        if let Some(container) = info {
+            if container.status == "running" {
+                self.confirm_message = format!("Stop container '{}'?", container.name);
+                self.confirm_action = Some(ConfirmAction::StopContainer(container.id.clone()));
+                self.mode = AppMode::ConfirmAction;
+            } else {
+                self.status_message = "Container is not running".to_string();
+            }
+        }
+    }
+
+    pub fn kill_container(&mut self) {
+        let info = self.get_selected_container().cloned();
+        if let Some(container) = info {
+            self.confirm_message = format!("Kill container '{}'?", container.name);
+            self.confirm_action = Some(ConfirmAction::KillContainer(container.id.clone()));
+            self.mode = AppMode::ConfirmAction;
+        }
+    }
+
+    pub fn delete_container(&mut self) {
+        let info = self.get_selected_container().cloned();
+        if let Some(container) = info {
+            self.confirm_message = format!("Delete container '{}'?", container.name);
+            self.confirm_action = Some(ConfirmAction::DeleteContainer(container.id.clone()));
+            self.mode = AppMode::ConfirmAction;
         }
     }
 
@@ -494,6 +700,7 @@ impl App {
             if file.is_dir {
                 self.current_path = file.path.clone();
                 self.selected_index = 0;
+                self.scroll_offset = 0;
                 self.files = self.load_files();
             } else {
                 self.open_file_editor();
@@ -509,6 +716,7 @@ impl App {
                     self.current_path = "/".to_string();
                 }
                 self.selected_index = 0;
+                self.scroll_offset = 0;
                 self.files = self.load_files();
             }
         }
@@ -527,8 +735,8 @@ impl App {
                     self.editor_cursor_x = 0;
                     self.editor_cursor_y = 0;
                     self.editor_modified = false;
+                    self.editor_file_path = Some(file.path.clone());
                     self.mode = AppMode::FileEditor;
-                    self.active_tab = ActiveTab::Editor;
                     self.status_message = format!("Editing: {}", file.path);
                 } else {
                     self.status_message = format!("Cannot read file: {}", file.path);
@@ -541,15 +749,13 @@ impl App {
         if self.editor_modified {
             if let Some(container_id) = &self.selected_container {
                 let rootfs = self.data_dir.join("containers").join(container_id).join("rootfs");
-                let _file_path = rootfs.join(self.current_path.trim_start_matches('/'));
-
-                if let Some(file) = self.files.get(self.selected_index) {
-                    let full_path = rootfs.join(file.path.trim_start_matches('/'));
+                if let Some(file_path) = &self.editor_file_path {
+                    let full_path = rootfs.join(file_path.trim_start_matches('/'));
                     if std::fs::write(&full_path, &self.editor_content).is_ok() {
                         self.editor_modified = false;
-                        self.status_message = format!("Saved: {}", file.path);
+                        self.status_message = format!("Saved: {}", file_path);
                     } else {
-                        self.status_message = format!("Failed to save: {}", file.path);
+                        self.status_message = format!("Failed to save: {}", file_path);
                     }
                 }
             }
@@ -558,10 +764,10 @@ impl App {
 
     pub fn close_editor(&mut self) {
         if self.editor_modified {
-            self.status_message = "File modified! Press Ctrl+S to save or Esc to discard".to_string();
+            self.status_message = "File modified! Ctrl+S to save, Esc again to discard".to_string();
+            self.editor_modified = false;
         } else {
             self.mode = AppMode::ContainerFiles;
-            self.active_tab = ActiveTab::Files;
             self.status_message = "Closed editor".to_string();
         }
     }
@@ -570,7 +776,7 @@ impl App {
         if let Some(file) = self.files.get(self.selected_index) {
             self.confirm_message = format!("Delete '{}'?", file.name);
             self.confirm_action = Some(ConfirmAction::DeleteFile(file.path.clone()));
-            self.mode = AppMode::ConfirmDelete;
+            self.mode = AppMode::ConfirmAction;
         }
     }
 
@@ -583,7 +789,7 @@ impl App {
             } else {
                 self.confirm_message = format!("Uninstall '{}'?", ext.name);
                 self.confirm_action = Some(ConfirmAction::UninstallExtension(ext.id.clone()));
-                self.mode = AppMode::ConfirmDelete;
+                self.mode = AppMode::ConfirmAction;
             }
         }
     }
@@ -613,11 +819,51 @@ impl App {
                         }
                     }
                 }
-                ConfirmAction::DeleteContainer(id) => {
-                    self.status_message = format!("Delete container {} (not implemented in TUI)", id);
-                }
                 ConfirmAction::StopContainer(id) => {
-                    self.status_message = format!("Stop container {} (not implemented in TUI)", id);
+                    let state_path = self.data_dir.join("containers").join(&id).join("state.json");
+                    if let Ok(content) = std::fs::read_to_string(&state_path) {
+                        if let Ok(mut state) = serde_json::from_str::<serde_json::Value>(&content) {
+                            state["state"] = serde_json::Value::String("Stopped".to_string());
+                            if let Ok(updated) = serde_json::to_string_pretty(&state) {
+                                let _ = std::fs::write(&state_path, updated);
+                            }
+                        }
+                    }
+                    self.status_message = format!("Container {} stopped", id);
+                    self.containers = self.load_containers();
+                }
+                ConfirmAction::KillContainer(id) => {
+                    if let Some(container) = self.containers.iter().find(|c| c.id == id) {
+                        if let Some(pid) = container.pid {
+                            unsafe {
+                                libc::kill(pid, libc::SIGKILL);
+                            }
+                        }
+                    }
+                    let state_path = self.data_dir.join("containers").join(&id).join("state.json");
+                    if let Ok(content) = std::fs::read_to_string(&state_path) {
+                        if let Ok(mut state) = serde_json::from_str::<serde_json::Value>(&content) {
+                            state["state"] = serde_json::Value::String("Stopped".to_string());
+                            if let Ok(updated) = serde_json::to_string_pretty(&state) {
+                                let _ = std::fs::write(&state_path, updated);
+                            }
+                        }
+                    }
+                    self.status_message = format!("Container {} killed", id);
+                    self.containers = self.load_containers();
+                }
+                ConfirmAction::DeleteContainer(id) => {
+                    let container_dir = self.data_dir.join("containers").join(&id);
+                    if container_dir.exists() {
+                        let _ = std::fs::remove_dir_all(&container_dir);
+                        self.status_message = format!("Container {} deleted", id);
+                    } else {
+                        self.status_message = format!("Container {} not found", id);
+                    }
+                    self.containers = self.load_containers();
+                    if self.selected_index >= self.containers.len() && self.selected_index > 0 {
+                        self.selected_index -= 1;
+                    }
                 }
                 ConfirmAction::UninstallExtension(id) => {
                     let ext_dir = self.data_dir.join("extensions").join(&id);
@@ -634,12 +880,12 @@ impl App {
                 }
             }
         }
-        self.mode = AppMode::ContainerFiles;
+        self.mode = AppMode::Normal;
     }
 
     pub fn cancel_confirm(&mut self) {
         self.confirm_action = None;
-        self.mode = AppMode::ContainerFiles;
+        self.mode = AppMode::Normal;
         self.status_message = "Cancelled".to_string();
     }
 
@@ -648,8 +894,8 @@ impl App {
         self.editor_cursor_x = 0;
         self.editor_cursor_y = 0;
         self.editor_modified = false;
+        self.editor_file_path = None;
         self.mode = AppMode::FileEditor;
-        self.active_tab = ActiveTab::Editor;
         self.status_message = "New file - Enter content and save with Ctrl+S".to_string();
     }
 
@@ -685,7 +931,21 @@ impl App {
         self.current_path = "/".to_string();
         self.files.clear();
         self.selected_index = 0;
+        self.scroll_offset = 0;
         self.status_message = "Exited file browser".to_string();
+    }
+
+    pub fn toggle_auto_refresh(&mut self) {
+        self.auto_refresh = !self.auto_refresh;
+        self.status_message = format!("Auto-refresh: {}", if self.auto_refresh { "ON" } else { "OFF" });
+    }
+
+    pub fn scroll_logs_down(&mut self) {
+        self.scroll_offset = self.scroll_offset.saturating_add(5);
+    }
+
+    pub fn scroll_logs_up(&mut self) {
+        self.scroll_offset = self.scroll_offset.saturating_sub(5);
     }
 }
 

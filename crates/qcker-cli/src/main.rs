@@ -17,7 +17,7 @@ use std::time::Duration;
 
 use tui::app::App;
 use tui::event::{AppEvent, EventHandler};
-use tui::handler::handle_key_event;
+use tui::handler::{handle_key_event, handle_mouse_event};
 use tui::ui::draw;
 
 #[derive(Parser)]
@@ -121,6 +121,8 @@ fn run_tui(data_dir: PathBuf) -> anyhow::Result<()> {
     let mut app = App::new(data_dir);
     app.refresh();
 
+    let mut tick_count: u64 = 0;
+
     loop {
         terminal.draw(|f| draw(f, &app))?;
 
@@ -128,7 +130,15 @@ fn run_tui(data_dir: PathBuf) -> anyhow::Result<()> {
             AppEvent::Input(key) => {
                 handle_key_event(&mut app, key);
             }
-            AppEvent::Tick => {}
+            AppEvent::Mouse(mouse) => {
+                handle_mouse_event(&mut app, mouse);
+            }
+            AppEvent::Tick => {
+                tick_count += 1;
+                if app.auto_refresh && tick_count % 8 == 0 {
+                    app.refresh();
+                }
+            }
         }
 
         if app.should_quit {

@@ -2,11 +2,24 @@ use ratatui::{
     layout::{Constraint, Direction, Layout, Rect},
     style::{Color, Modifier, Style},
     text::{Line, Span},
-    widgets::{Block, Borders, Cell, Clear, List, ListItem, Paragraph, Row, Table, Tabs},
+    widgets::{Block, Borders, Cell, Clear, Gauge, Paragraph, Row, Table, Tabs},
     Frame,
 };
 
 use super::app::{ActiveTab, App, AppMode};
+
+const BG: Color = Color::Rgb(28, 30, 38);
+const SURFACE: Color = Color::Rgb(40, 42, 54);
+const TEXT: Color = Color::Rgb(248, 248, 242);
+const TEXT_DIM: Color = Color::Rgb(98, 114, 164);
+const ACCENT: Color = Color::Rgb(139, 233, 253);
+const PURPLE: Color = Color::Rgb(189, 147, 249);
+const GREEN: Color = Color::Rgb(80, 250, 123);
+const YELLOW: Color = Color::Rgb(241, 250, 140);
+const RED: Color = Color::Rgb(255, 85, 85);
+const ORANGE: Color = Color::Rgb(255, 184, 108);
+const BORDER: Color = Color::Rgb(68, 71, 90);
+const SELECTED_BG: Color = Color::Rgb(68, 71, 90);
 
 pub fn draw(f: &mut Frame, app: &App) {
     let chunks = Layout::default()
@@ -14,69 +27,76 @@ pub fn draw(f: &mut Frame, app: &App) {
         .constraints([
             Constraint::Length(3),
             Constraint::Min(0),
-            Constraint::Length(3),
+            Constraint::Length(1),
+            Constraint::Length(1),
         ])
         .split(f.area());
 
     draw_header(f, app, chunks[0]);
     draw_content(f, app, chunks[1]);
-    draw_footer(f, app, chunks[2]);
+    draw_status_bar(f, app, chunks[2]);
+    draw_footer(f, app, chunks[3]);
 
     match app.mode {
-        AppMode::ConfirmDelete => draw_confirm_popup(f, app),
+        AppMode::ConfirmAction => draw_confirm_popup(f, app),
         AppMode::CommandInput => draw_command_popup(f, app),
+        AppMode::FileEditor => draw_editor_overlay(f, app),
         _ => {}
     }
 
     if app.show_help {
-        draw_help_popup(f);
+        draw_help_popup(f, app);
     }
 }
 
 fn draw_header(f: &mut Frame, app: &App, area: Rect) {
-    let titles = vec![
-        "Containers",
-        "Images",
-        "Networks",
-        "Volumes",
-        "Files",
-        "Editor",
-        "Marketplace",
-        "Logs",
-    ];
+    let titles: Vec<Line> = ActiveTab::all().iter().map(|tab| {
+        let title = tab.title();
+        if *tab == app.active_tab {
+            Line::from(Span::styled(
+                format!(" {} ", title),
+                Style::default().fg(ACCENT).add_modifier(Modifier::BOLD),
+            ))
+        } else {
+            Line::from(Span::styled(
+                format!(" {} ", title),
+                Style::default().fg(TEXT_DIM),
+            ))
+        }
+    }).collect();
 
-    let selected = match app.active_tab {
-        ActiveTab::Containers => 0,
-        ActiveTab::Images => 1,
-        ActiveTab::Networks => 2,
-        ActiveTab::Volumes => 3,
-        ActiveTab::Files => 4,
-        ActiveTab::Editor => 5,
-        ActiveTab::Marketplace => 6,
-        ActiveTab::Logs => 7,
-    };
+    let selected = ActiveTab::all().iter().position(|t| *t == app.active_tab).unwrap_or(0);
 
     let tabs = Tabs::new(titles)
         .block(Block::default()
-            .borders(Borders::ALL)
-            .title("Qcker"))
+            .borders(Borders::BOTTOM)
+            .border_style(Style::default().fg(BORDER))
+            .title(Span::styled(
+                " Qcker ",
+                Style::default().fg(PURPLE).add_modifier(Modifier::BOLD),
+            ))
+            .title_alignment(ratatui::layout::Alignment::Left)
+            .style(Style::default().bg(SURFACE)))
         .select(selected)
-        .style(Style::default().fg(Color::White))
-        .highlight_style(Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD));
+        .highlight_style(Style::default().fg(ACCENT).add_modifier(Modifier::BOLD))
+        .divider(Span::styled(" | ", Style::default().fg(BORDER)));
 
     f.render_widget(tabs, area);
 }
 
 fn draw_content(f: &mut Frame, app: &App, area: Rect) {
+    let block = Block::default()
+        .style(Style::default().bg(BG));
+    f.render_widget(block, area);
+
     match app.active_tab {
         ActiveTab::Containers => draw_containers(f, app, area),
         ActiveTab::Images => draw_images(f, app, area),
         ActiveTab::Networks => draw_networks(f, app, area),
         ActiveTab::Volumes => draw_volumes(f, app, area),
-        ActiveTab::Files => draw_files(f, app, area),
-        ActiveTab::Editor => draw_editor(f, app, area),
-        ActiveTab::Marketplace => draw_marketplace(f, app, area),
+        ActiveTab::Stats => draw_stats(f, app, area),
         ActiveTab::Logs => draw_logs(f, app, area),
+        ActiveTab::Marketplace => draw_marketplace(f, app, area),
     }
 }
 
@@ -89,27 +109,40 @@ fn draw_containers(f: &mut Frame, app: &App, area: Rect) {
         Cell::from("PID"),
         Cell::from("CREATED"),
     ])
-    .style(Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD))
-    .height(1);
+    .style(Style::default().fg(PURPLE).add_modifier(Modifier::BOLD))
+    .height(1)
+    .bottom_margin(1);
 
     let rows: Vec<Row> = app.containers.iter().enumerate().map(|(i, c)| {
         let style = if i == app.selected_index {
-            Style::default().bg(Color::DarkGray).fg(Color::White)
+            Style::default().bg(SELECTED_BG).fg(TEXT)
         } else {
-            Style::default().fg(Color::White)
+            Style::default().fg(TEXT)
         };
 
         let status_style = match c.status.as_str() {
-            "running" => Style::default().fg(Color::Green),
-            "created" => Style::default().fg(Color::Yellow),
-            "stopped" => Style::default().fg(Color::Red),
-            _ => Style::default().fg(Color::Gray),
+            "running" => Style::default().fg(GREEN),
+            "created" => Style::default().fg(YELLOW),
+            "stopped" => Style::default().fg(RED),
+            "paused" => Style::default().fg(ORANGE),
+            _ => Style::default().fg(TEXT_DIM),
+        };
+
+        let status_icon = match c.status.as_str() {
+            "running" => "+",
+            "created" => "~",
+            "stopped" => "-",
+            "paused" => "||",
+            _ => "?",
         };
 
         Row::new(vec![
             Cell::from(truncate(&c.id, 12)),
             Cell::from(truncate(&c.name, 18)),
-            Cell::from(Span::styled(truncate(&c.status, 10), status_style)),
+            Cell::from(Span::styled(
+                format!("{} {}", status_icon, truncate(&c.status, 10)),
+                status_style,
+            )),
             Cell::from(truncate(&c.image, 18)),
             Cell::from(c.pid.map_or("-".to_string(), |p| p.to_string())),
             Cell::from(truncate(&c.created, 16)),
@@ -123,7 +156,7 @@ fn draw_containers(f: &mut Frame, app: &App, area: Rect) {
         [
             Constraint::Length(13),
             Constraint::Length(19),
-            Constraint::Length(11),
+            Constraint::Length(13),
             Constraint::Length(19),
             Constraint::Length(8),
             Constraint::Min(17),
@@ -131,8 +164,13 @@ fn draw_containers(f: &mut Frame, app: &App, area: Rect) {
     )
     .header(header)
     .block(Block::default()
-        .borders(Borders::ALL)
-        .title(format!("Containers ({})", app.containers.len())));
+        .borders(Borders::NONE)
+        .title(Span::styled(
+            format!(" Containers ({}) ", app.containers.len()),
+            Style::default().fg(ACCENT).add_modifier(Modifier::BOLD),
+        ))
+        .style(Style::default().bg(BG)))
+    .highlight_style(Style::default().bg(SELECTED_BG));
 
     f.render_widget(table, area);
 }
@@ -144,20 +182,21 @@ fn draw_images(f: &mut Frame, app: &App, area: Rect) {
         Cell::from("SIZE"),
         Cell::from("CREATED"),
     ])
-    .style(Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD))
-    .height(1);
+    .style(Style::default().fg(PURPLE).add_modifier(Modifier::BOLD))
+    .height(1)
+    .bottom_margin(1);
 
     let rows: Vec<Row> = app.images.iter().enumerate().map(|(i, img)| {
         let style = if i == app.selected_index {
-            Style::default().bg(Color::DarkGray).fg(Color::White)
+            Style::default().bg(SELECTED_BG).fg(TEXT)
         } else {
-            Style::default().fg(Color::White)
+            Style::default().fg(TEXT)
         };
 
         Row::new(vec![
             Cell::from(truncate(&img.id, 12)),
             Cell::from(truncate(&img.tags, 30)),
-            Cell::from(truncate(&img.size, 10)),
+            Cell::from(Span::styled(truncate(&img.size, 10), Style::default().fg(YELLOW))),
             Cell::from(truncate(&img.created, 16)),
         ])
         .style(style)
@@ -175,8 +214,13 @@ fn draw_images(f: &mut Frame, app: &App, area: Rect) {
     )
     .header(header)
     .block(Block::default()
-        .borders(Borders::ALL)
-        .title(format!("Images ({})", app.images.len())));
+        .borders(Borders::NONE)
+        .title(Span::styled(
+            format!(" Images ({}) ", app.images.len()),
+            Style::default().fg(ACCENT).add_modifier(Modifier::BOLD),
+        ))
+        .style(Style::default().bg(BG)))
+    .highlight_style(Style::default().bg(SELECTED_BG));
 
     f.render_widget(table, area);
 }
@@ -188,20 +232,21 @@ fn draw_networks(f: &mut Frame, app: &App, area: Rect) {
         Cell::from("DRIVER"),
         Cell::from("SUBNET"),
     ])
-    .style(Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD))
-    .height(1);
+    .style(Style::default().fg(PURPLE).add_modifier(Modifier::BOLD))
+    .height(1)
+    .bottom_margin(1);
 
     let rows: Vec<Row> = app.networks.iter().enumerate().map(|(i, n)| {
         let style = if i == app.selected_index {
-            Style::default().bg(Color::DarkGray).fg(Color::White)
+            Style::default().bg(SELECTED_BG).fg(TEXT)
         } else {
-            Style::default().fg(Color::White)
+            Style::default().fg(TEXT)
         };
 
         Row::new(vec![
             Cell::from(truncate(&n.id, 12)),
             Cell::from(truncate(&n.name, 18)),
-            Cell::from(truncate(&n.driver, 10)),
+            Cell::from(Span::styled(truncate(&n.driver, 10), Style::default().fg(ACCENT))),
             Cell::from(truncate(&n.subnet, 18)),
         ])
         .style(style)
@@ -219,8 +264,13 @@ fn draw_networks(f: &mut Frame, app: &App, area: Rect) {
     )
     .header(header)
     .block(Block::default()
-        .borders(Borders::ALL)
-        .title(format!("Networks ({})", app.networks.len())));
+        .borders(Borders::NONE)
+        .title(Span::styled(
+            format!(" Networks ({}) ", app.networks.len()),
+            Style::default().fg(ACCENT).add_modifier(Modifier::BOLD),
+        ))
+        .style(Style::default().bg(BG)))
+    .highlight_style(Style::default().bg(SELECTED_BG));
 
     f.render_widget(table, area);
 }
@@ -231,19 +281,20 @@ fn draw_volumes(f: &mut Frame, app: &App, area: Rect) {
         Cell::from("DRIVER"),
         Cell::from("MOUNTPOINT"),
     ])
-    .style(Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD))
-    .height(1);
+    .style(Style::default().fg(PURPLE).add_modifier(Modifier::BOLD))
+    .height(1)
+    .bottom_margin(1);
 
     let rows: Vec<Row> = app.volumes.iter().enumerate().map(|(i, v)| {
         let style = if i == app.selected_index {
-            Style::default().bg(Color::DarkGray).fg(Color::White)
+            Style::default().bg(SELECTED_BG).fg(TEXT)
         } else {
-            Style::default().fg(Color::White)
+            Style::default().fg(TEXT)
         };
 
         Row::new(vec![
             Cell::from(truncate(&v.name, 18)),
-            Cell::from(truncate(&v.driver, 10)),
+            Cell::from(Span::styled(truncate(&v.driver, 10), Style::default().fg(ACCENT))),
             Cell::from(truncate(&v.mountpoint, 40)),
         ])
         .style(style)
@@ -260,132 +311,137 @@ fn draw_volumes(f: &mut Frame, app: &App, area: Rect) {
     )
     .header(header)
     .block(Block::default()
-        .borders(Borders::ALL)
-        .title(format!("Volumes ({})", app.volumes.len())));
+        .borders(Borders::NONE)
+        .title(Span::styled(
+            format!(" Volumes ({}) ", app.volumes.len()),
+            Style::default().fg(ACCENT).add_modifier(Modifier::BOLD),
+        ))
+        .style(Style::default().bg(BG)))
+    .highlight_style(Style::default().bg(SELECTED_BG));
 
     f.render_widget(table, area);
 }
 
-fn draw_files(f: &mut Frame, app: &App, area: Rect) {
-    let chunks = Layout::default()
-        .direction(Direction::Horizontal)
-        .constraints([Constraint::Percentage(30), Constraint::Percentage(70)])
-        .split(area);
-
-    let mut items: Vec<ListItem> = Vec::new();
-
-    if app.current_path != "/" {
-        items.push(ListItem::new(Line::from(Span::styled(
-            ".. (parent)",
-            Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD),
-        ))));
+fn draw_stats(f: &mut Frame, app: &App, area: Rect) {
+    if app.stats.is_empty() {
+        let msg = Paragraph::new(vec![
+            Line::from(""),
+            Line::from(Span::styled(
+                "  No running containers",
+                Style::default().fg(TEXT_DIM),
+            )),
+            Line::from(""),
+            Line::from(Span::styled(
+                "  Start a container to see real-time stats",
+                Style::default().fg(TEXT_DIM),
+            )),
+        ])
+        .style(Style::default().bg(BG));
+        f.render_widget(msg, area);
+        return;
     }
 
-    for (i, file) in app.files.iter().enumerate() {
-        let style = if i == app.selected_index {
-            Style::default().bg(Color::DarkGray).fg(Color::White)
-        } else if file.is_dir {
-            Style::default().fg(Color::Cyan)
-        } else {
-            Style::default().fg(Color::White)
-        };
-
-        let icon = if file.is_dir { "d" } else { "f" };
-        let size = if file.is_dir {
-            String::new()
-        } else {
-            format_size(file.size)
-        };
-
-        items.push(ListItem::new(Line::from(vec![
-            Span::styled(format!("[{}] ", icon), style),
-            Span::styled(truncate(&file.name, 20), style),
-            Span::styled(format!("  {}", size), Style::default().fg(Color::Gray)),
-        ])));
-    }
-
-    let list = List::new(items)
-        .block(Block::default()
-            .borders(Borders::ALL)
-            .title(truncate(&format!("Files: {}", app.current_path), 40)));
-
-    f.render_widget(list, chunks[0]);
-
-    let preview = if let Some(file) = app.files.get(app.selected_index) {
-        if file.is_dir {
-            "<Directory>".to_string()
-        } else {
-            let rootfs = app.data_dir.join("containers")
-                .join(app.selected_container.as_deref().unwrap_or(""))
-                .join("rootfs");
-            let full_path = rootfs.join(file.path.trim_start_matches('/'));
-
-            if let Ok(content) = std::fs::read_to_string(&full_path) {
-                let truncated = if content.len() > 2000 {
-                    format!("{}...\n\n[Truncated - {} bytes total]", &content[..2000], content.len())
-                } else {
-                    content
-                };
-                truncated
-            } else {
-                "<Cannot read file>".to_string()
-            }
-        }
-    } else {
-        "<Select a file>".to_string()
-    };
-
-    let preview_widget = Paragraph::new(preview)
-        .block(Block::default()
-            .borders(Borders::ALL)
-            .title("Preview"))
-        .style(Style::default().fg(Color::White))
-        .wrap(ratatui::widgets::Wrap { trim: true });
-
-    f.render_widget(preview_widget, chunks[1]);
-}
-
-fn draw_editor(f: &mut Frame, app: &App, area: Rect) {
     let chunks = Layout::default()
         .direction(Direction::Vertical)
-        .constraints([Constraint::Min(0), Constraint::Length(1)])
+        .constraints(app.stats.iter().map(|_| Constraint::Length(5)).collect::<Vec<_>>())
         .split(area);
 
-    let lines: Vec<Line> = app.editor_content
-        .lines()
-        .enumerate()
-        .map(|(i, line)| {
-            let line_num = format!("{:4} ", i + 1);
-            Line::from(vec![
-                Span::styled(line_num, Style::default().fg(Color::DarkGray)),
-                Span::styled(truncate(line, 100), Style::default().fg(Color::White)),
+    for (i, stat) in app.stats.iter().enumerate() {
+        if i >= chunks.len() {
+            break;
+        }
+
+        let cpu_ratio = (stat.cpu_percent / 100.0).clamp(0.0, 1.0);
+        let mem_ratio = if stat.memory_limit_mb > 0.0 {
+            (stat.memory_mb / stat.memory_limit_mb).clamp(0.0, 1.0)
+        } else {
+            0.0
+        };
+
+        let cpu_color = if cpu_ratio > 0.8 { RED } else if cpu_ratio > 0.5 { YELLOW } else { GREEN };
+        let mem_color = if mem_ratio > 0.8 { RED } else if mem_ratio > 0.5 { YELLOW } else { GREEN };
+
+        let inner = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints([
+                Constraint::Length(1),
+                Constraint::Length(1),
+                Constraint::Length(1),
+                Constraint::Length(1),
             ])
-        })
-        .collect();
+            .split(chunks[i]);
 
-    let editor = Paragraph::new(lines)
+        let title = Paragraph::new(Line::from(vec![
+            Span::styled(" ", Style::default().fg(TEXT)),
+            Span::styled(truncate(&stat.name, 20), Style::default().fg(ACCENT).add_modifier(Modifier::BOLD)),
+            Span::styled(format!(" ({})", truncate(&stat.id, 12)), Style::default().fg(TEXT_DIM)),
+        ]))
+        .style(Style::default().bg(BG));
+        f.render_widget(title, inner[0]);
+
+        let cpu_gauge = Gauge::default()
+            .block(Block::default().style(Style::default().bg(BG)))
+            .gauge_style(Style::default().fg(cpu_color).bg(SURFACE))
+            .ratio(cpu_ratio)
+            .label(Span::styled(
+                format!("CPU: {:.1}%", stat.cpu_percent),
+                Style::default().fg(TEXT),
+            ));
+        f.render_widget(cpu_gauge, inner[1]);
+
+        let mem_gauge = Gauge::default()
+            .block(Block::default().style(Style::default().bg(BG)))
+            .gauge_style(Style::default().fg(mem_color).bg(SURFACE))
+            .ratio(mem_ratio)
+            .label(Span::styled(
+                format!("MEM: {:.0}/{:.0} MB", stat.memory_mb, stat.memory_limit_mb),
+                Style::default().fg(TEXT),
+            ));
+        f.render_widget(mem_gauge, inner[2]);
+
+        let info = Paragraph::new(Line::from(vec![
+            Span::styled("  ", Style::default()),
+            Span::styled(format!("PIDs: {} ", stat.pids), Style::default().fg(TEXT_DIM)),
+            Span::styled(format!("NET: {}↓ {}↑ ", format_bytes(stat.net_rx), format_bytes(stat.net_tx)), Style::default().fg(ACCENT)),
+            Span::styled(format!("IO: {}↓ {}↑", format_bytes(stat.block_rx), format_bytes(stat.block_tx)), Style::default().fg(YELLOW)),
+        ]))
+        .style(Style::default().bg(BG));
+        f.render_widget(info, inner[3]);
+    }
+}
+
+fn draw_logs(f: &mut Frame, app: &App, area: Rect) {
+    let visible_height = area.height.saturating_sub(2) as usize;
+    let total = app.logs.len();
+    let start = app.scroll_offset.min(total.saturating_sub(visible_height));
+    let end = (start + visible_height).min(total);
+
+    let logs: Vec<Line> = app.logs[start..end].iter().map(|l| {
+        let level_style = match l.level.as_str() {
+            "ERROR" | "ERR" => Style::default().fg(RED),
+            "WARN" | "WARNING" => Style::default().fg(YELLOW),
+            "INFO" => Style::default().fg(ACCENT),
+            "DEBUG" | "TRACE" => Style::default().fg(TEXT_DIM),
+            _ => Style::default().fg(TEXT),
+        };
+
+        Line::from(vec![
+            Span::styled(format!(" {} ", l.timestamp), Style::default().fg(TEXT_DIM)),
+            Span::styled(format!("{:5} ", l.level), level_style),
+            Span::styled(truncate(&l.message, 120), Style::default().fg(TEXT)),
+        ])
+    }).collect();
+
+    let paragraph = Paragraph::new(logs)
         .block(Block::default()
-            .borders(Borders::ALL)
-            .title(if app.editor_modified {
-                "Editor *"
-            } else {
-                "Editor"
-            }))
-        .style(Style::default().fg(Color::White))
-        .wrap(ratatui::widgets::Wrap { trim: false });
+            .borders(Borders::NONE)
+            .title(Span::styled(
+                format!(" Logs ({}) ", total),
+                Style::default().fg(ACCENT).add_modifier(Modifier::BOLD),
+            ))
+            .style(Style::default().bg(BG)));
 
-    f.render_widget(editor, chunks[0]);
-
-    let status = format!(
-        "Ln {} Col {} | Ctrl+S:Save Esc:Close",
-        app.editor_cursor_y + 1,
-        app.editor_cursor_x + 1
-    );
-
-    let status_bar = Paragraph::new(status)
-        .style(Style::default().fg(Color::DarkGray).bg(Color::Black));
-
-    f.render_widget(status_bar, chunks[1]);
+    f.render_widget(paragraph, area);
 }
 
 fn draw_marketplace(f: &mut Frame, app: &App, area: Rect) {
@@ -396,28 +452,29 @@ fn draw_marketplace(f: &mut Frame, app: &App, area: Rect) {
         Cell::from("STATUS"),
         Cell::from("DESCRIPTION"),
     ])
-    .style(Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD))
-    .height(1);
+    .style(Style::default().fg(PURPLE).add_modifier(Modifier::BOLD))
+    .height(1)
+    .bottom_margin(1);
 
     let rows: Vec<Row> = app.marketplace.iter().enumerate().map(|(i, ext)| {
         let style = if i == app.selected_index {
-            Style::default().bg(Color::DarkGray).fg(Color::White)
+            Style::default().bg(SELECTED_BG).fg(TEXT)
         } else {
-            Style::default().fg(Color::White)
+            Style::default().fg(TEXT)
         };
 
         let status = if ext.built_in {
-            Span::styled("Built-in", Style::default().fg(Color::Green))
+            Span::styled("Built-in", Style::default().fg(GREEN))
         } else if ext.installed {
-            Span::styled("Installed", Style::default().fg(Color::Cyan))
+            Span::styled("Installed", Style::default().fg(ACCENT))
         } else {
-            Span::styled("Available", Style::default().fg(Color::Yellow))
+            Span::styled("Available", Style::default().fg(YELLOW))
         };
 
         Row::new(vec![
             Cell::from(truncate(&ext.name, 16)),
-            Cell::from(truncate(&ext.version, 8)),
-            Cell::from(truncate(&ext.category, 10)),
+            Cell::from(Span::styled(truncate(&ext.version, 8), Style::default().fg(TEXT_DIM))),
+            Cell::from(Span::styled(truncate(&ext.category, 10), Style::default().fg(ACCENT))),
             Cell::from(status),
             Cell::from(truncate(&ext.description, 30)),
         ])
@@ -437,74 +494,143 @@ fn draw_marketplace(f: &mut Frame, app: &App, area: Rect) {
     )
     .header(header)
     .block(Block::default()
-        .borders(Borders::ALL)
-        .title(format!("Extensions ({})", app.marketplace.len())));
+        .borders(Borders::NONE)
+        .title(Span::styled(
+            format!(" Extensions ({}) ", app.marketplace.len()),
+            Style::default().fg(ACCENT).add_modifier(Modifier::BOLD),
+        ))
+        .style(Style::default().bg(BG)))
+    .highlight_style(Style::default().bg(SELECTED_BG));
 
     f.render_widget(table, area);
 }
 
-fn draw_logs(f: &mut Frame, app: &App, area: Rect) {
-    let logs: Vec<Line> = app.logs.iter().map(|l| {
-        Line::from(Span::styled(truncate(l, 120), Style::default().fg(Color::White)))
-    }).collect();
+fn draw_status_bar(f: &mut Frame, app: &App, area: Rect) {
+    let left = match app.mode {
+        AppMode::ContainerFiles => {
+            format!(" Files: {} ", app.current_path)
+        }
+        _ => {
+            format!(" {} ", app.status_message)
+        }
+    };
 
-    let paragraph = Paragraph::new(logs)
-        .block(Block::default()
-            .borders(Borders::ALL)
-            .title("Logs"))
-        .wrap(ratatui::widgets::Wrap { trim: true });
+    let right = if app.auto_refresh {
+        format!("Auto:ON | {} ", app.last_refresh)
+    } else {
+        "Auto:OFF ".to_string()
+    };
 
-    f.render_widget(paragraph, area);
+    let status = Paragraph::new(Line::from(vec![
+        Span::styled(left, Style::default().fg(YELLOW).bg(SURFACE)),
+        Span::styled(right, Style::default().fg(TEXT_DIM).bg(SURFACE)),
+    ]))
+    .style(Style::default().bg(SURFACE));
+
+    f.render_widget(status, area);
 }
 
 fn draw_footer(f: &mut Frame, app: &App, area: Rect) {
     let help_text = match app.mode {
         AppMode::Normal => {
             match app.active_tab {
-                super::app::ActiveTab::Marketplace => "q:Quit Tab:Switch u:Uninstall r:Refresh h:Help",
-                super::app::ActiveTab::Containers => "q:Quit Tab:Switch Enter:Files r:Refresh h:Help",
-                _ => "q:Quit Tab:Switch r:Refresh h:Help",
+                ActiveTab::Containers => "q:Quit Tab:Switch Enter:Files s:Stop d:Delete r:Refresh a:AutoRefresh h:Help",
+                ActiveTab::Marketplace => "q:Quit Tab:Switch u:Uninstall r:Refresh h:Help",
+                ActiveTab::Logs => "q:Quit Tab:Switch g:Top G:Bottom r:Refresh h:Help",
+                ActiveTab::Stats => "q:Quit Tab:Switch r:Refresh h:Help",
+                _ => "q:Quit Tab:Switch r:Refresh a:AutoRefresh h:Help",
             }
         },
-        AppMode::ContainerFiles => "q:Back Enter:Open d:Delete n:New m:Mkdir Esc:Exit",
-        AppMode::FileEditor => "Ctrl+S:Save Esc:Close",
+        AppMode::ContainerFiles => "Esc:Back Enter:Open e:Edit d:Delete n:New m:Mkdir r:Refresh",
+        AppMode::FileEditor => "Ctrl+S:Save Esc:Close Arrow:Move",
         AppMode::CommandInput => "Enter:Confirm Esc:Cancel",
-        AppMode::ConfirmDelete => "y:Yes n:No",
+        AppMode::ConfirmAction => "y:Yes n:No",
     };
 
-    let status = truncate(&app.status_message, 50);
-
     let footer = Paragraph::new(Line::from(vec![
-        Span::styled(status, Style::default().fg(Color::Yellow)),
-        Span::raw(" | "),
-        Span::styled(help_text, Style::default().fg(Color::Gray)),
+        Span::styled(" ", Style::default()),
+        Span::styled(help_text, Style::default().fg(TEXT_DIM).bg(SURFACE)),
     ]))
-    .block(Block::default().borders(Borders::ALL));
+    .style(Style::default().bg(SURFACE));
 
     f.render_widget(footer, area);
+}
+
+fn draw_editor_overlay(f: &mut Frame, app: &App) {
+    let area = centered_rect(80, 80, f.area());
+
+    let lines: Vec<Line> = app.editor_content
+        .lines()
+        .enumerate()
+        .map(|(i, line)| {
+            let line_num = format!("{:4} ", i + 1);
+            Line::from(vec![
+                Span::styled(line_num, Style::default().fg(TEXT_DIM).bg(SURFACE)),
+                Span::styled(truncate(line, 200), Style::default().fg(TEXT)),
+            ])
+        })
+        .collect();
+
+    let title = if app.editor_modified {
+        " Editor * "
+    } else {
+        " Editor "
+    };
+
+    let editor = Paragraph::new(lines)
+        .block(Block::default()
+            .borders(Borders::ALL)
+            .border_style(Style::default().fg(PURPLE))
+            .title(Span::styled(title, Style::default().fg(ACCENT).add_modifier(Modifier::BOLD)))
+            .style(Style::default().bg(BG)))
+        .wrap(ratatui::widgets::Wrap { trim: false });
+
+    f.render_widget(Clear, area);
+    f.render_widget(editor, area);
+
+    let status = format!(
+        " Ln {} Col {} | Ctrl+S:Save Esc:Close",
+        app.editor_cursor_y + 1,
+        app.editor_cursor_x + 1
+    );
+
+    let status_bar = Paragraph::new(Line::from(vec![
+        Span::styled(" ", Style::default()),
+        Span::styled(status, Style::default().fg(TEXT_DIM).bg(SURFACE)),
+    ]))
+    .style(Style::default().bg(SURFACE));
+
+    let inner = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([Constraint::Min(0), Constraint::Length(1)])
+        .split(area);
+
+    f.render_widget(status_bar, inner[1]);
 }
 
 fn draw_confirm_popup(f: &mut Frame, app: &App) {
     let area = centered_rect(40, 20, f.area());
 
     let text = vec![
+        Line::from(""),
         Line::from(Span::styled(
-            truncate(&app.confirm_message, 30),
-            Style::default().fg(Color::Red).add_modifier(Modifier::BOLD),
+            format!("  {}", truncate(&app.confirm_message, 40)),
+            Style::default().fg(RED).add_modifier(Modifier::BOLD),
         )),
         Line::from(""),
         Line::from(Span::styled(
-            "y = Yes, n = No",
-            Style::default().fg(Color::Gray),
+            "  y = Yes, n = No",
+            Style::default().fg(TEXT_DIM),
         )),
     ];
 
     let popup = Paragraph::new(text)
         .block(Block::default()
             .borders(Borders::ALL)
-            .title("Confirm")
-            .style(Style::default().bg(Color::DarkGray)))
-        .alignment(ratatui::layout::Alignment::Center);
+            .border_style(Style::default().fg(RED))
+            .title(Span::styled(" Confirm ", Style::default().fg(RED).add_modifier(Modifier::BOLD)))
+            .style(Style::default().bg(SURFACE)))
+        .alignment(ratatui::layout::Alignment::Left);
 
     f.render_widget(Clear, area);
     f.render_widget(popup, area);
@@ -514,62 +640,74 @@ fn draw_command_popup(f: &mut Frame, app: &App) {
     let area = centered_rect(50, 15, f.area());
 
     let text = vec![
+        Line::from(""),
         Line::from(Span::styled(
-            truncate(&app.status_message, 40),
-            Style::default().fg(Color::Yellow),
+            format!("  {}", truncate(&app.status_message, 40)),
+            Style::default().fg(YELLOW),
         )),
         Line::from(""),
         Line::from(vec![
-            Span::styled("> ", Style::default().fg(Color::Cyan)),
-            Span::styled(truncate(&app.command_input, 30), Style::default().fg(Color::White)),
-            Span::styled("_", Style::default().fg(Color::White).add_modifier(Modifier::SLOW_BLINK)),
+            Span::styled("  > ", Style::default().fg(ACCENT)),
+            Span::styled(truncate(&app.command_input, 30), Style::default().fg(TEXT)),
+            Span::styled("_", Style::default().fg(TEXT).add_modifier(Modifier::SLOW_BLINK)),
         ]),
     ];
 
     let popup = Paragraph::new(text)
         .block(Block::default()
             .borders(Borders::ALL)
-            .title("Input")
-            .style(Style::default().bg(Color::DarkGray)));
+            .border_style(Style::default().fg(ACCENT))
+            .title(Span::styled(" Input ", Style::default().fg(ACCENT).add_modifier(Modifier::BOLD)))
+            .style(Style::default().bg(SURFACE)));
 
     f.render_widget(Clear, area);
     f.render_widget(popup, area);
 }
 
-fn draw_help_popup(f: &mut Frame) {
-    let area = centered_rect(50, 50, f.area());
+fn draw_help_popup(f: &mut Frame, _app: &App) {
+    let area = centered_rect(50, 60, f.area());
 
     let help_text = vec![
-        Line::from(Span::styled("Qcker TUI Help", Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD))),
+        Line::from(Span::styled("  Qcker TUI Help", Style::default().fg(PURPLE).add_modifier(Modifier::BOLD))),
         Line::from(""),
-        Line::from(Span::styled("Navigation:", Style::default().fg(Color::Yellow))),
-        Line::from("  Tab        Switch tabs"),
-        Line::from("  Up/Down    Navigate"),
+        Line::from(Span::styled("  Navigation", Style::default().fg(YELLOW).add_modifier(Modifier::BOLD))),
+        Line::from(Span::styled("  Tab / Shift+Tab   Switch tabs", Style::default().fg(TEXT))),
+        Line::from(Span::styled("  Up/Down or j/k    Navigate items", Style::default().fg(TEXT))),
+        Line::from(Span::styled("  PageUp/PageDown   Scroll pages", Style::default().fg(TEXT))),
+        Line::from(Span::styled("  Mouse click       Select item", Style::default().fg(TEXT))),
+        Line::from(Span::styled("  Mouse scroll      Scroll list", Style::default().fg(TEXT))),
         Line::from(""),
-        Line::from(Span::styled("Containers:", Style::default().fg(Color::Yellow))),
-        Line::from("  Enter      Browse files"),
+        Line::from(Span::styled("  Containers", Style::default().fg(YELLOW).add_modifier(Modifier::BOLD))),
+        Line::from(Span::styled("  Enter             Browse files", Style::default().fg(TEXT))),
+        Line::from(Span::styled("  s                 Stop container", Style::default().fg(TEXT))),
+        Line::from(Span::styled("  d                 Delete container", Style::default().fg(TEXT))),
         Line::from(""),
-        Line::from(Span::styled("Files:", Style::default().fg(Color::Yellow))),
-        Line::from("  Enter      Open"),
-        Line::from("  e          Edit"),
-        Line::from("  d          Delete"),
-        Line::from("  n          New file"),
-        Line::from("  m          New dir"),
+        Line::from(Span::styled("  Files", Style::default().fg(YELLOW).add_modifier(Modifier::BOLD))),
+        Line::from(Span::styled("  Enter             Open file/dir", Style::default().fg(TEXT))),
+        Line::from(Span::styled("  e                 Edit file", Style::default().fg(TEXT))),
+        Line::from(Span::styled("  d                 Delete file", Style::default().fg(TEXT))),
+        Line::from(Span::styled("  n                 New file", Style::default().fg(TEXT))),
+        Line::from(Span::styled("  m                 New directory", Style::default().fg(TEXT))),
+        Line::from(Span::styled("  Backspace         Go up", Style::default().fg(TEXT))),
         Line::from(""),
-        Line::from(Span::styled("Extensions:", Style::default().fg(Color::Yellow))),
-        Line::from("  u/Enter    Uninstall"),
+        Line::from(Span::styled("  Editor", Style::default().fg(YELLOW).add_modifier(Modifier::BOLD))),
+        Line::from(Span::styled("  Ctrl+S            Save", Style::default().fg(TEXT))),
+        Line::from(Span::styled("  Esc               Close", Style::default().fg(TEXT))),
+        Line::from(Span::styled("  Arrow keys        Move cursor", Style::default().fg(TEXT))),
         Line::from(""),
-        Line::from(Span::styled("General:", Style::default().fg(Color::Yellow))),
-        Line::from("  r          Refresh"),
-        Line::from("  h          Help"),
-        Line::from("  q          Quit"),
+        Line::from(Span::styled("  General", Style::default().fg(YELLOW).add_modifier(Modifier::BOLD))),
+        Line::from(Span::styled("  r                 Refresh", Style::default().fg(TEXT))),
+        Line::from(Span::styled("  a                 Toggle auto-refresh", Style::default().fg(TEXT))),
+        Line::from(Span::styled("  h                 Help", Style::default().fg(TEXT))),
+        Line::from(Span::styled("  q                 Quit", Style::default().fg(TEXT))),
     ];
 
     let help = Paragraph::new(help_text)
         .block(Block::default()
             .borders(Borders::ALL)
-            .title("Help")
-            .style(Style::default().bg(Color::DarkGray)));
+            .border_style(Style::default().fg(PURPLE))
+            .title(Span::styled(" Help ", Style::default().fg(ACCENT).add_modifier(Modifier::BOLD)))
+            .style(Style::default().bg(SURFACE)));
 
     f.render_widget(Clear, area);
     f.render_widget(help, area);
@@ -603,14 +741,14 @@ fn truncate(s: &str, max_len: usize) -> String {
     }
 }
 
-fn format_size(size: u64) -> String {
-    if size < 1024 {
-        format!("{} B", size)
-    } else if size < 1024 * 1024 {
-        format!("{:.1} KB", size as f64 / 1024.0)
-    } else if size < 1024 * 1024 * 1024 {
-        format!("{:.1} MB", size as f64 / (1024.0 * 1024.0))
+fn format_bytes(bytes: u64) -> String {
+    if bytes < 1024 {
+        format!("{}B", bytes)
+    } else if bytes < 1024 * 1024 {
+        format!("{:.1}KB", bytes as f64 / 1024.0)
+    } else if bytes < 1024 * 1024 * 1024 {
+        format!("{:.1}MB", bytes as f64 / (1024.0 * 1024.0))
     } else {
-        format!("{:.1} GB", size as f64 / (1024.0 * 1024.0 * 1024.0))
+        format!("{:.1}GB", bytes as f64 / (1024.0 * 1024.0 * 1024.0))
     }
 }

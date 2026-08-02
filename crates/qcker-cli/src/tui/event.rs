@@ -1,8 +1,10 @@
-use crossterm::event::{self, Event, KeyEvent};
+use crossterm::event::{self, Event, KeyEvent, MouseEvent};
+
 use std::time::Duration;
 
 pub enum AppEvent {
     Input(KeyEvent),
+    Mouse(MouseEvent),
     Tick,
 }
 
@@ -17,8 +19,10 @@ impl EventHandler {
 
     pub fn next(&self) -> anyhow::Result<AppEvent> {
         if event::poll(self.tick_rate)? {
-            if let Event::Key(key) = event::read()? {
-                return Ok(AppEvent::Input(key));
+            match event::read()? {
+                Event::Key(key) => return Ok(AppEvent::Input(key)),
+                Event::Mouse(mouse) => return Ok(AppEvent::Mouse(mouse)),
+                _ => {}
             }
         }
         Ok(AppEvent::Tick)
